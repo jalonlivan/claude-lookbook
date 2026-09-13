@@ -11,16 +11,28 @@ Single entry point: CLI + local server. Python 3 stdlib only.
       --accent <#hex>        headless: override the preset accent
       --timeout <seconds>    server self-terminate, default 900
       --wait                 block until submission (humans only, not agents)
+      --emit-html [path]     write a picker that needs no server, then exit
+      --apply <blob>         write the config from a static picker's paste-back
 
     exit 0   valid config now exists, or the server is up and the result path
              is printed for the caller to poll
     exit 2   timed out or aborted by user
-    exit 3   invalid arguments / unwritable project dir
+    exit 3   invalid arguments, unwritable project dir, or the server could
+             not be started
+
+The server binds 127.0.0.1, so the printed URL only works when the browser is
+on the same machine. Over SSH it is not, and the run prints the `ssh -L` line
+to fix that. Where no port can be forwarded at all -- a locked-down box, a
+container that does not forward -- `--emit-html` drops the server entirely and
+returns the result as a command to paste back.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
+import getpass
 import hmac
 import http.client
 import json
@@ -51,6 +63,10 @@ MAX_BODY_BYTES = 256 * 1024  # JSON submissions; uploads have their own cap
 EXIT_OK = 0
 EXIT_ABORTED = 2
 EXIT_BADARGS = 3
+
+
+class LaunchError(RuntimeError):
+    """The detached server could not be started."""
 
 # Only these files are ever served. No directory walk, no traversal surface.
 SERVABLE = {
@@ -127,6 +143,79 @@ def server_alive(info: dict) -> bool:
         return json.loads(body.decode("utf-8")).get("launchId") == info.get("launchId")
     except Exception:
         return False
+
+
+# ==========================================================================
+# Where is the browser?
+#
+# The server binds 127.0.0.1. That address means "this machine", so the printed
+# URL is only clickable when the browser runs on the same machine as the server.
+#
+#   local      terminal on your own laptop -- browser is right here, works
+#   ssh        terminal on a remote box    -- browser is elsewhere, URL is dead
+#   forwarded  a container or WSL          -- usually forwarded for you, maybe not
+#
+# Detection is one variable: SSH_CONNECTION. Everything it misses is what
+# --emit-html exists for.
+# ==========================================================================
+
+
+def detect_location() -> tuple[str, dict]:
+    """Returns (kind, details). kind is 'local', 'ssh' or 'forwarded'."""
+    ssh = os.environ.get("SSH_CONNECTION", "").split()
+    if len(ssh) >= 4:
+        return "ssh", {"host": ssh[2], "port": ssh[3]}
+    if os.environ.get("SSH_CLIENT") or os.environ.get("SSH_TTY"):
+        return "ssh", {}
+
+    # Technically local, but the browser may still be across a boundary. These
+    # hosts normally forward ports themselves; when they do not, the URL simply
+    # fails to open and --emit-html is the way out.
+    if os.environ.get("CODESPACES"):
+        return "forwarded", {"what": "a GitHub Codespace"}
+    if os.environ.get("REMOTE_CONTAINERS") or os.environ.get("DEVCONTAINER"):
+        return "forwarded", {"what": "a dev container"}
+    if os.path.exists("/.dockerenv"):
+        return "forwarded", {"what": "a container"}
+    if os.environ.get("WSL_DISTRO_NAME"):
+        return "forwarded", {"what": "WSL"}
+    return "local", {}
+
+
+def access_lines(url: str, port: int, kind: str, details: dict) -> list[str]:
+    """How this particular user actually reaches that URL."""
+    if kind == "ssh":
+        host = details.get("host", "<this-host>")
+        ssh_port = details.get("port", "22")
+        try:
+            user = getpass.getuser()
+        except Exception:
+            user = "<user>"
+        flag = "" if ssh_port in ("22", "") else f" -p {ssh_port}"
+        lines = [
+            "",
+            "  This shell is over SSH, so 127.0.0.1 here is not 127.0.0.1 in your",
+            "  browser. Forward the port first -- run this in a second terminal",
+            "  on your own machine, and leave it running:",
+            "",
+            f"    ssh -N{flag} -L {port}:127.0.0.1:{port} {user}@{host}",
+            "",
+            "  Then open the URL above in your browser as normal.",
+            "  (If you connected through VS Code or Cursor, the port is likely",
+            "  already forwarded -- try the URL first.)",
+            "",
+            "  Cannot forward a port? Re-run with --emit-html for a picker file",
+            "  that needs no server.",
+        ]
+        return lines
+
+    if kind == "forwarded":
+        what = details.get("what", "this environment")
+        return [
+            f"  ({what} usually forwards this port for you. If the URL does not",
+            "   open, re-run with --emit-html for a picker that needs no server.)",
+        ]
+    return []
 
 
 # ==========================================================================
@@ -276,6 +365,8 @@ class PickHandler(BaseHTTPRequestHandler):
         if filename.endswith(".html"):
             ctype = "text/html; charset=utf-8"
             body = body.replace(b"__LOOKBOOK_TOKEN__", self.server.token.encode())
+            body = body.replace(b"__LOOKBOOK_MODE__", b"server")
+            body = body.replace(b"__LOOKBOOK_DATA__", b"null")
             extra["Content-Security-Policy"] = (
                 "default-src 'none'; "
                 "img-src 'self' data: blob:; "
@@ -409,12 +500,19 @@ def bind_server(project: str, token: str, launch_id: str) -> PickServer:
         except OSError as exc:
             last = exc
             continue
-    raise SystemExit(f"no free port in {PORT_START}-{PORT_END}: {last}")
+    raise LaunchError(
+        f"every port from {PORT_START} to {PORT_END} is busy ({last}). "
+        "Close another lookbook picker, or wait for one to time out."
+    )
 
 
 def serve(project: str, token: str, launch_id: str, timeout: int) -> int:
     """Run the server until submission or timeout. Returns an exit code."""
-    httpd = bind_server(project, token, launch_id)
+    try:
+        httpd = bind_server(project, token, launch_id)
+    except LaunchError as exc:
+        sys.stderr.write(f"lookbook: {exc}\n")
+        return EXIT_BADARGS
     port = httpd.server_address[1]
     url = f"http://127.0.0.1:{port}/?t={token}"
 
@@ -459,18 +557,18 @@ def spawn_detached(project: str, token: str, launch_id: str, timeout: int) -> di
     clear_runtime(project)
     os.makedirs(os.path.dirname(runtime_path(project)), exist_ok=True)
 
+    # `--opt=value`, never `--opt value`: a urlsafe token can begin with "-",
+    # and argparse would read that as the next flag rather than as this one's
+    # value. Roughly one launch in sixty-four, which is exactly the kind of
+    # failure that looks random.
     cmd = [
         sys.executable,
         os.path.abspath(__file__),
-        "--project",
-        os.path.abspath(project),
+        f"--project={os.path.abspath(project)}",
         "--serve",
-        "--token",
-        token,
-        "--launch-id",
-        launch_id,
-        "--timeout",
-        str(timeout),
+        f"--token={token}",
+        f"--launch-id={launch_id}",
+        f"--timeout={timeout}",
     ]
 
     kwargs: dict = {"cwd": os.path.abspath(project), "close_fds": True}
@@ -499,9 +597,115 @@ def spawn_detached(project: str, token: str, launch_id: str, timeout: int) -> di
             return info
         time.sleep(0.15)
 
-    raise SystemExit(
-        "server did not come up within 15s; see " + log_path(project)
+    # The child failed before it could advertise itself. Its complaint is in the
+    # log; surfacing it beats making the user go and read the file.
+    reason = ""
+    try:
+        with open(log_path(project), "r", encoding="utf-8", errors="replace") as fh:
+            tail = [ln.strip() for ln in fh.readlines()[-12:] if ln.strip()]
+        reason = next((ln for ln in reversed(tail) if "lookbook:" in ln or "no free port" in ln), "")
+        reason = reason or (tail[-1] if tail else "")
+    except OSError:
+        pass
+
+    raise LaunchError(
+        "the picker server did not start within 15s."
+        + (f"\n  {reason}" if reason else "")
+        + f"\n  Full log: {log_path(project)}"
     )
+
+
+# ==========================================================================
+# No-server path: a static picker plus a paste-back command
+#
+# Port forwarding is not always possible or wanted. This writes a single
+# self-contained HTML file with the same UI, which the user opens however they
+# can get at it. Since the page cannot reach back, it hands them a command to
+# paste into the terminal they already have open.
+# ==========================================================================
+
+
+def ui_source() -> str:
+    with open(os.path.join(UI_DIR, "index.html"), "r", encoding="utf-8") as fh:
+        return fh.read()
+
+
+def _data_uri(filename: str) -> str:
+    with open(os.path.join(UI_DIR, filename), "rb") as fh:
+        return "data:image/png;base64," + base64.b64encode(fh.read()).decode("ascii")
+
+
+def render_ui(mode: str, token: str, data: dict | None) -> str:
+    html = ui_source()
+
+    if mode == "static":
+        # Opened from the filesystem, so "/logo.png" resolves to nothing. The
+        # images have to travel inside the file.
+        for name in ("logo.png", "favicon.png"):
+            html = html.replace(f"/{name}?t=__LOOKBOOK_TOKEN__", _data_uri(name))
+
+    html = html.replace("__LOOKBOOK_TOKEN__", token)
+    html = html.replace("__LOOKBOOK_MODE__", mode)
+    html = html.replace(
+        "__LOOKBOOK_DATA__",
+        json.dumps(data, ensure_ascii=False) if data is not None else "null",
+    )
+    return html
+
+
+def emit_html(project: str, dest: str) -> str:
+    """Write the self-contained picker. Returns the path written."""
+    script = os.path.abspath(__file__)
+    data = {
+        "presets": [
+            {
+                "name": name,
+                "label": p["label"],
+                "blurb": p["blurb"],
+                "tokens": p["tokens"],
+                "avoid": p["avoid"],
+            }
+            for name, p in schema.PRESETS.items()
+        ],
+        "project": os.path.basename(project) or project,
+        "command": f'python "{script}" --project "{project}" --apply ',
+    }
+    html = render_ui("static", "static", data)
+
+    dest = os.path.abspath(dest)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    with open(dest, "w", encoding="utf-8") as fh:
+        fh.write(html)
+    return dest
+
+
+def apply_blob(project: str, blob: str) -> dict:
+    """Decode what the static picker handed back and write the config."""
+    text = blob.strip().strip("'\"")
+    padded = text + "=" * (-len(text) % 4)
+    try:
+        raw = base64.urlsafe_b64decode(padded.encode("ascii"))
+        payload = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, binascii.Error) as exc:
+        raise schema.SchemaError(
+            f"could not read that --apply value ({exc}). Copy the whole command "
+            "the picker showed, including the long token at the end."
+        ) from None
+    if not isinstance(payload, dict):
+        raise schema.SchemaError("--apply payload is not an object")
+
+    doc = schema.build_config(
+        preset=str(payload.get("preset", "")),
+        accent=payload.get("accent") or None,
+        tokens_override=payload.get("tokens")
+        if isinstance(payload.get("tokens"), dict)
+        else None,
+        avoid_extra=[str(a)[:200] for a in (payload.get("avoid") or [])[:40]],
+        references=[],
+        notes=str(payload.get("notes", ""))[:4000] or None,
+    )
+    schema.write_config(project, doc)
+    return doc
 
 
 # ==========================================================================
@@ -525,6 +729,11 @@ def build_parser() -> Parser:
     p.add_argument("--accent", help="headless: override the preset accent")
     p.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT, help="server self-terminate seconds")
     p.add_argument("--wait", action="store_true", help="block until submission (humans only)")
+    p.add_argument("--emit-html", nargs="?", const="", metavar="PATH",
+                   help="write a self-contained picker that needs no server, and exit "
+                        "(default path: .claude/lookbook-picker.html)")
+    p.add_argument("--apply", metavar="BLOB",
+                   help="write the config from a static picker's paste-back value")
     # internal: the detached child re-enters here
     p.add_argument("--serve", action="store_true", help=argparse.SUPPRESS)
     p.add_argument("--token", help=argparse.SUPPRESS)
@@ -567,6 +776,49 @@ def main(argv=None) -> int:
         if not args.token or not args.launch_id:
             return EXIT_BADARGS
         return serve(project, args.token, args.launch_id, args.timeout)
+
+    # ---- Paste-back from a static picker. ----
+    # An explicit human action: they picked, then pasted. Writing is the whole
+    # point, so this does not stop for an existing config -- but it says what
+    # it replaced.
+    if args.apply:
+        previous = schema.read_config(project)
+        try:
+            doc = apply_blob(project, args.apply)
+        except schema.SchemaError as exc:
+            sys.stderr.write(f"lookbook: {exc}\n")
+            return EXIT_BADARGS
+        except OSError as exc:
+            sys.stderr.write(f"lookbook: could not write config: {exc}\n")
+            return EXIT_BADARGS
+        if previous:
+            print(f"lookbook: replaced the {previous['preset']} config.")
+        print(f"lookbook: wrote {doc['preset']} tokens")
+        print(f"  accent: {doc['tokens']['color']['accent']}")
+        print(f"RESULT: {schema.config_path(project)}")
+        return EXIT_OK
+
+    # ---- Static picker, for when no port can be forwarded. ----
+    if args.emit_html is not None:
+        dest = args.emit_html or os.path.join(project, ".claude", "lookbook-picker.html")
+        try:
+            written = emit_html(project, dest)
+        except OSError as exc:
+            sys.stderr.write(f"lookbook: could not write {dest}: {exc}\n")
+            return EXIT_BADARGS
+        kind, _details = detect_location()
+        print(f"lookbook: wrote a self-contained picker to\n  {written}")
+        print("\n  It needs no server and no forwarded port. Open it in a browser:")
+        if kind == "ssh":
+            print(f"    scp {getpass.getuser()}@<host>:'{written}' . && open ./"
+                  + os.path.basename(written))
+            print("  or open it through your editor's remote file browser.")
+        else:
+            print(f"    open {written}   (or double-click it)")
+        print("\n  Pick a direction, then paste the command it gives you back into")
+        print("  this terminal. That is what writes the config.")
+        print(f"RESULT: {schema.config_path(project)}")
+        return EXIT_OK
 
     if args.preset and args.preset not in schema.PRESETS:
         sys.stderr.write(
@@ -615,12 +867,20 @@ def main(argv=None) -> int:
         # at ~2 minutes and takes the server with it.
         token = secrets.token_urlsafe(24)
         launch_id = secrets.token_hex(8)
-        httpd = bind_server(project, token, launch_id)
+        try:
+            httpd = bind_server(project, token, launch_id)
+        except LaunchError as exc:
+            sys.stderr.write(f"lookbook: {exc}\n")
+            return EXIT_BADARGS
         port = httpd.server_address[1]
         url = f"http://127.0.0.1:{port}/?t={token}"
+        kind, details = detect_location()
         print(f"lookbook: open {url}")
+        for line in access_lines(url, port, kind, details):
+            print(line)
         print(f"RESULT: {schema.config_path(project)}")
-        if not args.print_url:
+        # Opening a browser on the box the user is SSH'd into helps nobody.
+        if not args.print_url and kind == "local":
             webbrowser.open(url)
 
         def guillotine():
@@ -657,22 +917,33 @@ def main(argv=None) -> int:
 
     # Poll mode: reuse a live server for this project rather than stacking up
     # a new one every time an agent re-runs the command.
+    kind, details = detect_location()
+
     info = read_runtime(project)
     if info and server_alive(info):
         print("lookbook: a picker is already running for this project.")
         print(f"  URL: {info['url']}")
+        for line in access_lines(info["url"], int(info["port"]), kind, details):
+            print(line)
         print(f"RESULT: {info['resultPath']}")
         return EXIT_OK
 
     token = secrets.token_urlsafe(24)
     launch_id = secrets.token_hex(8)
-    info = spawn_detached(project, token, launch_id, args.timeout)
+    try:
+        info = spawn_detached(project, token, launch_id, args.timeout)
+    except LaunchError as exc:
+        sys.stderr.write(f"lookbook: {exc}\n")
+        return EXIT_BADARGS
 
     print("lookbook: picker running. Open this and choose a direction:")
     print(f"  URL: {info['url']}")
     print(f"  expires in {args.timeout}s")
+    for line in access_lines(info["url"], int(info["port"]), kind, details):
+        print(line)
     print(f"RESULT: {info['resultPath']}")
-    if not args.print_url:
+    # Opening a browser on the box the user is SSH'd into helps nobody.
+    if not args.print_url and kind == "local":
         webbrowser.open(info["url"])
     return EXIT_OK
 

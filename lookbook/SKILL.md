@@ -61,6 +61,47 @@ filesystem, not through the tool call.
 The server shuts itself down the moment the form is submitted, and self-
 terminates after `--timeout` seconds (default 900) if nobody ever shows up.
 
+### Where is the browser?
+
+The server binds `127.0.0.1`. That address means *this machine*, so the URL is
+only clickable when the browser and the server are the same machine. Three
+cases, and the command sorts them out for you:
+
+| case | what happens |
+| --- | --- |
+| Terminal on the user's own laptop | The URL works. Nothing to do. |
+| Terminal on a remote box over SSH | The URL is dead until a port is forwarded. The run detects `SSH_CONNECTION` and prints the exact `ssh -L` line to paste in a second terminal. **Relay that block to the user verbatim** — it contains their host and port. |
+| VS Code / Cursor over SSH | The editor usually forwards the port already, so the URL just works. The `ssh -L` block is printed anyway and costs nothing. |
+
+A browser is never opened automatically when the shell is remote — opening one
+on the box the user is SSH'd into helps nobody.
+
+**Containers, WSL and Codespaces** normally forward the port themselves, and
+`SSH_CONNECTION` does not catch them. When they do not forward, the URL simply
+fails to open. That is what `--emit-html` is for.
+
+### When no port can be forwarded
+
+```bash
+python <skill-dir>/scripts/pick.py --project . --emit-html
+```
+
+This writes a single self-contained HTML file — presets, styles and images all
+inlined, no server, no network. The user opens it however they can (scp it,
+their editor's remote file browser, a file share). Because the page has no way
+to reach back, it hands them a command:
+
+```
+python .../pick.py --project . --apply <blob>
+```
+
+They paste that into the terminal they already have open, and *that* writes the
+config. Tell them this step is required — picking alone writes nothing.
+
+Two limits of this path: reference-image upload is off (there is no server to
+receive the file), and `--apply` writes even when a valid config exists, since
+pasting it is itself an explicit choice. It reports what it replaced.
+
 ### Idempotence
 
 If a valid `.claude/branding.json` already exists, the command prints it and

@@ -51,6 +51,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         },
         "avoid": [
             "Inter, Roboto, DM Sans",
+            "em dashes in headings or body copy",
             "indigo/violet gradients",
             "glassmorphism and blur panels",
             "three equal-weight icon+heading+sentence cards",
@@ -82,6 +83,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         },
         "avoid": [
             "Inter, Roboto, DM Sans",
+            "em dashes in headings or body copy",
             "indigo/violet gradients",
             "any border-radius -- corners are square",
             "drop shadows and elevation layers",
@@ -112,6 +114,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         },
         "avoid": [
             "Inter, Roboto, DM Sans",
+            "em dashes in headings or body copy",
             "indigo/violet gradients",
             "soft shadows, blur, glassmorphism",
             "mid-weight type -- use 300 or 700, nothing between",
@@ -142,6 +145,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         },
         "avoid": [
             "Inter, Roboto, DM Sans",
+            "em dashes in headings or body copy",
             "indigo/violet gradients",
             "neon or saturated accents; the accent is a muted metallic",
             "bold weights above 500",
@@ -172,6 +176,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         },
         "avoid": [
             "Inter, Roboto, DM Sans",
+            "em dashes in headings or body copy",
             "indigo/violet gradients",
             "marketing-scale type; body text stays at 13-14px",
             "decorative hero sections",
@@ -203,6 +208,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         },
         "avoid": [
             "Inter, Roboto, DM Sans",
+            "em dashes in headings or body copy",
             "indigo/violet gradients",
             "glassmorphism and blur panels",
             "three equal-weight icon+heading+sentence cards",

@@ -40,6 +40,15 @@ a{color:var(--accent)}
 ::selection{background:rgba(230,125,34,.3)}
 :focus-visible{outline:none;box-shadow:var(--glow)}
 .mono{font-family:var(--mono)}
+.cmd{
+  text-align:left;white-space:pre-wrap;word-break:break-all;max-height:190px;
+  overflow:auto;font-size:10.5px;line-height:1.5;color:var(--text);
+}
+.banner{
+  border:1px dashed var(--border);border-radius:var(--r);background:var(--sunken);
+  padding:10px 12px;margin-bottom:16px;font-size:12px;color:var(--muted);
+}
+.banner b{color:var(--accent);font-weight:600}
 .hidden{display:none!important}
 
 .wrap{max-width:1220px;margin:0 auto;padding:0 20px 64px}
@@ -326,7 +335,7 @@ details.tune>summary:hover{color:var(--muted)}
         </details>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="refsPanel">
         <p class="sec-label">References</p>
         <div class="drop" id="drop" tabindex="0" role="button">
           <b>Drop a screenshot</b> or click to browse
@@ -356,7 +365,7 @@ details.tune>summary:hover{color:var(--muted)}
       <div>
         <button class="btn btn-lg" id="submit" type="button">Use this look</button>
         <div class="status" id="status"></div>
-        <p class="note">Writes <code>.claude/branding.json</code> and shuts this server down.</p>
+        <p class="note" id="submitNote">Writes <code>.claude/branding.json</code> and shuts this server down.</p>
       </div>
     </aside>
   </div>
@@ -367,7 +376,13 @@ details.tune>summary:hover{color:var(--muted)}
   <h2 id="doneTitle">Direction locked.</h2>
   <p>Claude is polling for this file and will pick it up within a few seconds.</p>
   <code id="donePath"></code>
-  <p style="margin-top:14px">You can close this tab.</p>
+  <div id="pasteBack" class="hidden">
+    <p style="margin:14px 0 8px">Paste this into the terminal where you ran lookbook.
+       That is what writes the config.</p>
+    <code id="applyCmd" class="cmd"></code>
+    <button class="btn" id="copyCmd" type="button" style="margin-top:12px">Copy command</button>
+  </div>
+  <p style="margin-top:14px" id="closeNote">You can close this tab.</p>
 </div>
 
 <script>
@@ -375,6 +390,8 @@ details.tune>summary:hover{color:var(--muted)}
 "use strict";
 
 var TOKEN = "__LOOKBOOK_TOKEN__";
+var MODE = "__LOOKBOOK_MODE__";      // "server" or "static"
+var EMBEDDED = __LOOKBOOK_DATA__;    // presets inlined when there is no server
 function q(s){ return document.querySelector(s); }
 
 var PRESETS = [];
@@ -725,25 +742,62 @@ function setStatus(msg, isErr){
   el.className = "status" + (msg ? (isErr ? " err" : " ok") : "");
 }
 function payload(){
+  // Only the deltas. The server and --apply both rebuild from the preset, so
+  // an untouched pick is a handful of bytes rather than a wall of JSON.
+  var o = overrides[selected] || {};
   var t = tokensFor(selected);
+  var tokens = {};
+  if (o.color)  tokens.color  = o.color;
+  if (o.radius) tokens.radius = o.radius;
+  if (o.spacing) tokens.spacing = o.spacing;
+  if (typeof o.shadow === "string") tokens.shadow = o.shadow;
+  if (o.type){
+    tokens.type = {};
+    if (o.type.display) tokens.type.display = {family: o.type.display};
+    if (o.type.body)    tokens.type.body    = {family: o.type.body};
+  }
+
   var kept = generatedAvoid().filter(function(a){ return !(dropped[selected] || {})[a]; });
-  return {
-    preset: selected,
-    accent: t.color.accent,
-    tokens: {
-      color: t.color,
-      type: {display:{family:t.type.display.family}, body:{family:t.type.body.family}},
-      radius: t.radius,
-      spacing: t.spacing,
-      shadow: t.shadow
-    },
-    avoid: kept.concat(extraAvoid),
-    references: refs.map(function(r){ return {path:r.path, note:r.note}; }),
-    notes: q("#notes").value
-  };
+  var base = (preset(selected) || {}).avoid || [];
+  // Anything the human removed is simply not sent; anything they added rides along.
+  var avoid = kept.concat(extraAvoid).filter(function(a){ return base.indexOf(a) < 0; });
+
+  var out = {preset: selected, accent: t.color.accent};
+  if (Object.keys(tokens).length) out.tokens = tokens;
+  if (avoid.length) out.avoid = avoid;
+  if (refs.length) out.references = refs.map(function(r){ return {path:r.path, note:r.note}; });
+  if (q("#notes").value.trim()) out.notes = q("#notes").value;
+  return out;
+}
+
+function toBase64Url(text){
+  var bytes = new TextEncoder().encode(text);
+  var bin = "";
+  for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function finish(title){
+  q("#doneTitle").textContent = title;
+  q("#app").classList.add("hidden");
+  q("#done").classList.remove("hidden");
+  document.title = "lookbook — done";
+}
+
+function submitStatic(){
+  // No server to post to: hand back a command for the terminal they already have.
+  var cmd = EMBEDDED.command + toBase64Url(JSON.stringify(payload()));
+  q("#donePath").classList.add("hidden");
+  q("#closeNote").textContent = "Then you can close this tab.";
+  q("#applyCmd").textContent = cmd;
+  q("#pasteBack").classList.remove("hidden");
+  finish(preset(selected).label + " selected.");
+  q("#done").querySelector("p").textContent =
+    "This picker had no server to write through, so the last step is yours.";
 }
 function submit(){
   if (busy) return;
+  if (MODE === "static") return submitStatic();
   busy = true;
   q("#submit").disabled = true;
   setStatus("Writing…");
@@ -758,10 +812,7 @@ function submit(){
       return;
     }
     q("#donePath").textContent = r.path;
-    q("#doneTitle").textContent = preset(selected).label + " locked.";
-    q("#app").classList.add("hidden");
-    q("#done").classList.remove("hidden");
-    document.title = "lookbook — done";
+    finish(preset(selected).label + " locked.");
   })["catch"](function(){
     busy = false; q("#submit").disabled = false;
     setStatus("server unreachable — it may have timed out", true);
@@ -870,12 +921,54 @@ q("#webfonts").addEventListener("change", function(e){ loadWebfonts(e.target.che
 q("#submit").addEventListener("click", submit);
 
 // ---------------------------------------------------------------- boot
-api("/api/presets", {method:"GET"}).then(function(r){
-  if (!r.ok) throw new Error(r.error || "no presets");
-  PRESETS = r.presets;
-  q("#projName").innerHTML = "project&nbsp;&nbsp;<b>" + esc(r.project) + "</b>";
+function boot(presets, project){
+  PRESETS = presets;
+  q("#projName").innerHTML = "project&nbsp;&nbsp;<b>" + esc(project) + "</b>";
   renderGrid();
   select(PRESETS[0].name);
+}
+
+q("#copyCmd").addEventListener("click", function(){
+  var text = q("#applyCmd").textContent;
+  var done = function(){
+    q("#copyCmd").textContent = "Copied";
+    setTimeout(function(){ q("#copyCmd").textContent = "Copy command"; }, 1600);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done, selectCmd);
+  } else {
+    selectCmd();
+  }
+});
+function selectCmd(){
+  // Clipboard access is blocked on file:// in some browsers -- select it instead
+  // so the user only has to press Ctrl+C.
+  var range = document.createRange();
+  range.selectNodeContents(q("#applyCmd"));
+  var sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  q("#copyCmd").textContent = "Selected — press Ctrl+C";
+}
+
+if (MODE === "static"){
+  // No server: presets are inlined, uploads are impossible, and the result
+  // goes back as a command the user pastes.
+  q("#refsPanel").classList.add("hidden");
+  var note = document.createElement("div");
+  note.className = "banner";
+  note.innerHTML = "<b>Offline picker.</b> There is no server behind this page, so "
+    + "reference-image upload is off. When you submit, you will get a command to "
+    + "paste back into your terminal.";
+  q("#grid").parentNode.insertBefore(note, q("#grid"));
+  q("#submitNote").innerHTML =
+    "Gives you a command to paste back into your terminal. "
+    + "Nothing is written until you run it.";
+  boot(EMBEDDED.presets, EMBEDDED.project);
+} else {
+api("/api/presets", {method:"GET"}).then(function(r){
+  if (!r.ok) throw new Error(r.error || "no presets");
+  boot(r.presets, r.project);
 })["catch"](function(){
   q("#app").classList.add("hidden");
   var d = q("#done");
@@ -884,6 +977,7 @@ api("/api/presets", {method:"GET"}).then(function(r){
   d.querySelector("p").textContent = "Re-run the lookbook skill to open a fresh one.";
   q("#donePath").classList.add("hidden");
 });
+}
 })();
 </script>
 </body>

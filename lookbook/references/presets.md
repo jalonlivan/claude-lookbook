@@ -11,6 +11,8 @@ relative to the picked palette**: entries that contradict the chosen accent or r
 are dropped at build time, and a lock line naming the exact accent is always appended.
 A global "never purple" rule would be wrong -- plenty of brands are deliberately
 purple. What the list forbids is the *default*, the colour nobody chose.
+The two content rules (a narrow font stack, no em dashes) hold across every preset:
+distinctive visuals paired with generic AI-tell prose is still generic AI-tell prose.
 
 ---
 
@@ -36,6 +38,7 @@ Serif display, cream ground, one warm accent, near-zero radius.
 Base `avoid` list:
 
 - Inter, Roboto, DM Sans
+- em dashes in headings or body copy
 - indigo/violet gradients
 - glassmorphism and blur panels
 - three equal-weight icon+heading+sentence cards
@@ -65,6 +68,7 @@ Grotesk, white and black, one accent, visible grid, generous whitespace.
 Base `avoid` list:
 
 - Inter, Roboto, DM Sans
+- em dashes in headings or body copy
 - indigo/violet gradients
 - any border-radius -- corners are square
 - drop shadows and elevation layers
@@ -93,6 +97,7 @@ Weight extremes (200 vs 900), hard edges, one loud colour, no shadow.
 Base `avoid` list:
 
 - Inter, Roboto, DM Sans
+- em dashes in headings or body copy
 - indigo/violet gradients
 - soft shadows, blur, glassmorphism
 - mid-weight type -- use 300 or 700, nothing between
@@ -121,6 +126,7 @@ Near-black ground, thin type, image-led, minimal chrome.
 Base `avoid` list:
 
 - Inter, Roboto, DM Sans
+- em dashes in headings or body copy
 - indigo/violet gradients
 - neon or saturated accents; the accent is a muted metallic
 - bold weights above 500
@@ -149,6 +155,7 @@ Muted low-saturation, tight radii, high information density, full state coverage
 Base `avoid` list:
 
 - Inter, Roboto, DM Sans
+- em dashes in headings or body copy
 - indigo/violet gradients
 - marketing-scale type; body text stays at 13-14px
 - decorative hero sections
@@ -177,6 +184,7 @@ Your own palette, fonts and reference images.
 Base `avoid` list:
 
 - Inter, Roboto, DM Sans
+- em dashes in headings or body copy
 - indigo/violet gradients
 - glassmorphism and blur panels
 - three equal-weight icon+heading+sentence cards
