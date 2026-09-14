@@ -1,0 +1,24 @@
+{
+  "name": "lookbook",
+  "displayName": "lookbook",
+  "version": "2.0.0",
+  "description": "Pick a website's visual direction before Claude writes any UI code, then generate a real logo and favicon set from it. Writes design tokens to .claude/branding.json for every UI-generating skill to obey.",
+  "author": {
+    "name": "Jalon Livan",
+    "url": "https://github.com/jalonlivan"
+  },
+  "homepage": "https://github.com/jalonlivan/claude-lookbook",
+  "repository": "https://github.com/jalonlivan/claude-lookbook",
+  "license": "MIT",
+  "keywords": [
+    "design",
+    "design-tokens",
+    "branding",
+    "ui",
+    "favicon",
+    "logo",
+    "theme",
+    "dark-mode"
+  ],
+  "skills": ["./"]
+}

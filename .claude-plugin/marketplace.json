@@ -1,0 +1,17 @@
+{
+  "name": "claude-lookbook",
+  "owner": {
+    "name": "Jalon Livan",
+    "url": "https://github.com/jalonlivan"
+  },
+  "plugins": [
+    {
+      "name": "lookbook",
+      "source": "./",
+      "description": "Pick a website's visual direction before any UI code is written, then generate a real logo and favicon set that matches it.",
+      "version": "2.0.0",
+      "homepage": "https://github.com/jalonlivan/claude-lookbook",
+      "license": "MIT"
+    }
+  ]
+}

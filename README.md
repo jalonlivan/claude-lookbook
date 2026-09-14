@@ -1,206 +1,238 @@
-# lookbook — build spec
+<div align="center">
+  <img src="lookbook/assets/ui/logo.png" alt="lookbook" width="380">
 
-A Claude Code skill that opens a local web UI where a human picks a website's
-visual direction *before* Claude writes any UI code. It writes design tokens to
-`.claude/branding.json`, which any UI-generating skill then reads and obeys.
+  <p>
+    <a href="https://ko-fi.com/jalonlivan">
+      <img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=flat-square&logo=kofi&logoColor=white" alt="Buy me a coffee on Ko-fi">
+    </a>
+    <img src="https://img.shields.io/badge/license-MIT-8A8A8A?style=flat-square" alt="MIT license">
+    <img src="https://img.shields.io/badge/python-3.8%2B-8A8A8A?style=flat-square&logo=python&logoColor=white" alt="Python 3.8 or newer">
+    <img src="https://img.shields.io/badge/dependencies-none-8A8A8A?style=flat-square" alt="No dependencies">
+  </p>
+</div>
 
-This file is the working spec. Update it as decisions change.
+# lookbook
+
+**Pick how your site looks before Claude writes a single line of UI code.**
+
+Left unconstrained, models converge on the same page: Inter, an indigo gradient
+on white, rounded cards, a three-icon feature grid. That is not a bug, it is
+distributional convergence. Safe choices dominate the training data.
+
+lookbook fixes the input side. A human clicks a look in a local web UI, and the
+result is a token file that every UI-generating skill in the project reads and
+obeys. Then `mark` turns that same pick into a real logo and a full favicon set.
 
 ---
 
-## 1. Problem
+## Install
 
-Left unconstrained, models converge on the same output: Inter, an indigo/violet
-gradient on white, rounded cards, a three-icon feature grid. This is
-distributional convergence, not a bug — safe choices dominate the training data.
+### Option A: as a plugin (recommended)
 
-Existing design skills fix this with *heuristics* ("avoid Inter", "pick an
-aesthetic direction"). They know what generic looks like but have no idea what
-**your** product should look like. The remaining gap is the input side: today the
-only way to express taste is to hand-write a token spec or paste a prompt prefix
-every session.
+In Claude Code, run:
 
-lookbook is a GUI for that. Click a look, drop a reference screenshot, get a
-persisted token file.
+```
+/plugin marketplace add jalonlivan/claude-lookbook
+/plugin install lookbook@claude-lookbook
+```
+
+That gives you both skills and the `/lookbook` slash command in one step.
+Restart Claude Code if the command does not appear immediately.
+
+### Option B: manually
+
+Clone the repo and copy the two skill folders into your skills directory:
+
+```bash
+git clone https://github.com/jalonlivan/claude-lookbook.git
+cd claude-lookbook
+
+# personal install, available in every project
+mkdir -p ~/.claude/skills ~/.claude/commands
+cp -r lookbook mark ~/.claude/skills/
+cp commands/lookbook.md ~/.claude/commands/
+```
+
+For a single project instead, copy into `.claude/skills/` and
+`.claude/commands/` inside that project.
+
+### Requirements
+
+Python 3.8 or newer, and nothing else. No pip, no npm, no build step, no API
+key. Every script in here uses only the standard library, including the PNG and
+ICO encoders and the TrueType font rasterizer.
+
+Check it is working:
+
+```bash
+python lookbook/scripts/pick.py --project . --preset brutalist
+```
 
 ---
 
-## 2. Locked decisions
+## Use it
 
-| Decision | Value |
+```
+/lookbook
+```
+
+That opens the picker, hands you a URL, and waits while you choose. When you
+submit, Claude reads your pick and carries on.
+
+| command | what it does |
 | --- | --- |
-| Name | `lookbook` |
-| Audience | Public skill, others install it |
-| Config location | Per-project `.claude/branding.json` |
-| Dependency direction | One-way. lookbook knows nothing about its callers. |
-| Runtime | Python 3 stdlib only. No pip, no npm, no `uv`. |
-| Bind address | `127.0.0.1` only |
+| `/lookbook` | open the picker and wait for a choice |
+| `/lookbook void` | skip the UI and write that preset directly |
+| `/lookbook --force` | re-pick, replacing an existing choice |
+| `/lookbook --emit-html` | write an offline picker that needs no server |
+| `/lookbook --status` | show the current pick without launching anything |
+
+You can also just ask. Both skills carry descriptions that Claude matches on,
+so "give this site a visual direction" or "make a favicon for this app" will
+reach them without the slash command.
 
 ---
 
-## 3. Layout
+## What you are choosing between
 
-```
-lookbook/
-├── SKILL.md
-├── scripts/
-│   ├── pick.py          # CLI + server, single entry point
-│   └── schema.py        # validation + defaults
-├── assets/
-│   └── ui/index.html    # single file, inline CSS/JS, no build step
-└── references/
-    └── presets.md       # full token values per preset
-```
+Step one is the ground, because it is the decision everything else hangs off.
 
-Keep `SKILL.md` under ~500 lines. Preset token tables live in
-`references/presets.md` and are read only when needed.
+### Light ground: colour in the ink
 
----
+A pale ground, a pigment accent, elevation by shadow.
 
-## 4. CLI contract
+| preset | the look |
+| --- | --- |
+| `editorial-warm` | serif display, cream ground, one warm accent, near-zero radius |
+| `swiss-neutral` | grotesk, white and black, one accent, visible grid, generous whitespace |
+| `brutalist` | weight extremes, hard edges, one loud colour, no shadow |
+| `product-dense` | muted and low-saturation, tight radii, high information density |
 
-Everything the skill does goes through one command. Callers depend on this
-signature, so treat it as public API.
+### Dark ground: colour in the emission
 
-```
-pick.py --project <dir> [options]
+This is not dark mode. Dark mode is a colour inversion. These pages are **lit**:
+one thing glows, everything else stays near-monochrome so the glow reads, and
+the interface is built out of 1px hairline borders instead of shadows.
 
-  --print-url            print URL and exit, do not open a browser
-  --force                re-pick even if a valid config exists
-  --preset <name>        headless: write tokens without the UI
-  --accent <#hex>        headless: override the preset accent
-  --timeout <seconds>    server self-terminate, default 900
-  --wait                 block until submission (humans only, not agents)
+| preset | the look |
+| --- | --- |
+| `void` | pure black, one spotlit chromatic object, pill buttons, logo wall |
+| `platform` | deep navy, soft glow behind dimensional objects, a saturated CTA that is deliberately not the glow colour |
+| `bloom` | near-black with a grained aurora, monospace code panel, saturated pill CTA |
+| `gallery` | navy washing to blue, one italic serif word in a sans headline, a grid of work |
+| `console` | flat dark app chrome, hairline borders, one restrained accent, full state coverage |
+| `dark-luxe` | near-black ground, thin type, image-led, minimal chrome |
 
-exit 0   valid config now exists (pre-existing or newly written)
-exit 2   timed out or aborted by user
-exit 3   invalid arguments / unwritable project dir
-```
+Plus `custom`, which is the strongest path rather than a fallback. Upload a
+screenshot and write free-text instructions. A picture beats prose because it
+stops the model reaching for a familiar archetype.
 
-**Idempotence is the most important property here.** If a valid
-`.claude/branding.json` already exists and `--force` is absent, exit 0
-immediately and launch nothing. Without this, every callers' run pops a browser
-window and the skill gets uninstalled within a week.
+Every preset ships concrete values, not adjectives. Full tables are in
+[`lookbook/references/presets.md`](lookbook/references/presets.md).
 
 ---
 
-## 5. The handshake
+## Features
 
-Agent bash calls time out (~2 minutes by default). A server that blocks while a
-human fiddles with colour pickers will be killed mid-thought. So the data comes
-back through the filesystem, not the tool call.
+### The picker previews itself
 
-1. `pick.py` binds the port, forks a detached server, prints the URL **and the
-   result path**, exits immediately.
-2. `SKILL.md` instructs Claude to poll for `.claude/branding.json` in a loop
-   (e.g. `sleep 10` × 60), reporting the URL to the user on the first pass.
-3. The form POSTs, the handler validates and writes the JSON, the server shuts
-   itself down.
-4. Claude reads the file. If a reference image was uploaded, Claude reads the
-   image too.
+Each card renders in its own tokens, including its lighting. A spot glow, a
+grained aurora, a navy-to-blue wash and a flat console all look like themselves
+in the grid, because lighting is the thing you are choosing and the first thing
+a small thumbnail loses.
 
-`--wait` exists for humans running it by hand. Agents always use poll mode.
+### It writes tokens, not vibes
+
+`.claude/branding.json` carries exact values: six colours, a ground and its hue
+cast, a lighting spec, hairline and raise colours, display, body and monospace
+faces with weights, a type scale, four radii, a spacing base, density, and
+motion timing.
+
+### The avoid list is generated per project
+
+Rather than a global "never purple" rule, which would be wrong because plenty of
+brands are deliberately purple, the list forbids **the default nobody chose**.
+It is built relative to your picked palette, so entries that contradict your
+accent are dropped automatically, and a line naming your exact accent is always
+appended. `bloom` is deliberately purple and says so on the card.
+
+Two content rules hold across every preset: no generic font stack, and no em
+dashes in headings or body copy. Distinctive visuals wrapped in generic
+AI-tell prose still read as generic AI-tell prose.
+
+### Optional light and dark palettes
+
+A preset carries an `altMode` palette where the reference genuinely has one.
+Where it does not, `altMode` is explicitly `null`, and that null is an
+instruction: this look has no other mode, so do not invent one.
+
+### It works over SSH
+
+The server binds `127.0.0.1`, which means *this machine*. When your terminal is
+on a remote box, your browser is not, so lookbook detects that and prints the
+exact `ssh -L` line to forward the port, with your real host and port filled in.
+If you are connected through the VS Code or Cursor extension, the port is
+usually forwarded already and the URL simply works.
+
+Where no port can be forwarded at all, `--emit-html` writes a single
+self-contained HTML file with everything inlined. You open it however you can,
+pick a look, and it hands you a command to paste back into your terminal. That
+paste is what writes the config.
+
+### It never surprises you
+
+If a valid `.claude/branding.json` already exists, lookbook exits immediately
+and launches nothing. Without that, every run would pop a browser window and
+the skill would be uninstalled within a week. Use `--force` to re-pick.
+
+### It is safe to run on a shared machine
+
+A localhost server is reachable by any page in your browser, so lookbook binds
+`127.0.0.1` only, mints a fresh random token per launch and requires it on every
+request, compares it in constant time, rejects cross-origin requests, sends a
+restrictive CSP, serves a fixed whitelist of files with no traversal surface,
+validates uploads by magic bytes rather than extension, and self-terminates
+after a timeout so an abandoned run leaves nothing listening.
 
 ---
 
-## 6. Server rules
+## mark: logos and favicons
 
-Since this ships publicly, it runs on other people's machines. A plain localhost
-server is reachable by **any page in the user's browser** — any website can POST
-to `127.0.0.1:6780` and silently rewrite someone's branding config, or read it
-back.
+The second skill turns your pick into real files. Claude's usual reflex for a
+logo is a `<div>` with Tailwind classes, which cannot go in a browser tab, an
+iOS home screen, a PWA manifest or a README.
 
-- Bind `127.0.0.1` only. Never `0.0.0.0`.
-- Port: try 6780, walk upward to 6799 on `EADDRINUSE`, print the port actually
-  bound. Two projects open at once is a normal Tuesday.
-- Generate a random token per launch. Put it in the URL query, require it on
-  every POST, compare in constant time.
-- Reject any request carrying a cross-origin `Origin` or `Referer` header.
-- Send `Cache-Control: no-store`.
-- Self-terminate at `--timeout`. An abandoned run must not leave a listener open
-  on someone's laptop.
-- Serve only from `assets/ui/`. No path traversal, no arbitrary file reads.
-
-**Uploads:** validate magic bytes (not the extension), cap at ~5 MB, store under
-`.claude/branding/refs/` with generated filenames, never echo the original
-filename back into a path.
-
----
-
-## 7. Output schema
-
-```json
-{
-  "schemaVersion": 1,
-  "preset": "editorial-warm",
-  "tokens": {
-    "color": {
-      "bg":      "#FBF3EF",
-      "surface": "#FFFFFF",
-      "text":    "#1C1512",
-      "muted":   "#7A6A62",
-      "accent":  "#C2603F",
-      "border":  "#E8DBD3"
-    },
-    "type": {
-      "display": { "family": "Fraunces", "weights": [600, 900] },
-      "body":    { "family": "Source Sans 3", "weights": [400, 600] },
-      "scale":   [12, 14, 16, 20, 28, 44, 72]
-    },
-    "radius":  { "sm": "2px", "md": "4px", "lg": "8px" },
-    "spacing": { "base": 8 },
-    "shadow":  "none"
-  },
-  "avoid": [
-    "Inter, Roboto, DM Sans",
-    "indigo/violet gradients",
-    "glassmorphism and blur panels",
-    "three equal-weight icon+heading+sentence cards",
-    "gradient text"
-  ],
-  "references": [
-    { "path": ".claude/branding/refs/a1f2.png", "note": "spacing and type scale, not the colours" }
-  ],
-  "meta": { "createdAt": "2026-09-13T12:00:00Z", "tool": "lookbook" }
-}
+```bash
+python mark/scripts/mark.py --project . text  --text "Acme Supply" --font Georgia
+python mark/scripts/mark.py --project . shape --shape ring
+python mark/scripts/mark.py --project . image --image assets/logo.png
 ```
 
-`schemaVersion` goes in from day one. The token shape will change once real
-output exists, and public installs will be sitting on old files.
+Three sources, one pipeline, and colours and corner radius come from
+`branding.json` automatically. A brand that chose square corners gets a square
+icon.
 
-**The `avoid` list is per-project and generated relative to the picked palette.**
-A global "never purple" rule is wrong — plenty of brands are deliberately purple.
-What the list forbids is the *default*, the colour nobody chose.
+It writes `favicon.ico` with 16, 32 and 48 in one container, the modern PNG
+sizes, an opaque `apple-touch-icon.png` because iOS composites alpha onto black,
+maskable PWA icons with a wider safe zone, `site.webmanifest`, the `<head>`
+snippet, and **real vector SVGs** built from outline paths rather than `<text>`,
+so they render anywhere without the font installed.
 
----
+Font handling is done from scratch: a TrueType parser, glyph outline extraction
+including composite glyphs, and an antialiased scanline rasterizer, all in the
+standard library. Style matching uses the numeric `OS/2` weight class rather
+than the subfamily string, because on a localised Windows that string reads
+"Negreta" rather than "Bold".
 
-## 8. Presets
-
-Five looks plus custom. Each ships concrete values in `references/presets.md` —
-hexes, font families, weights, a spacing base. Adjectives alone ("editorial,
-warm") do nothing on the next turn.
-
-1. **editorial-warm** — serif display, cream ground, warm single accent, near-zero radius
-2. **swiss-neutral** — grotesk, white/black, one accent, visible grid, generous whitespace
-3. **brutalist** — weight extremes (200 vs 900), hard edges, one loud colour, no shadow
-4. **dark-luxe** — near-black ground, thin type, image-led, minimal chrome
-5. **product-dense** — muted low-saturation, tight radii, high information density, full state coverage
-6. **custom** — image upload plus free-text instructions
-
-The custom path is the strongest feature, not a fallback. A picture beats prose
-because it stops the model falling back on a familiar archetype. Store the path
-and let the calling session read the image directly.
-
-Preset 5 exists because the other four optimise for expressive marketing pages.
-Dashboards, tables and settings live or die on density and state coverage
-(loading, empty, error), which "be distinctive" does not address.
+Run `--list-fonts` to see what is installed, and `--list-shapes` for the
+procedural marks.
 
 ---
 
-## 9. Contract for consuming skills
+## For skill authors
 
-Any UI-generating skill declares lookbook as a precondition. It does not import
-it, wrap it, or reimplement it.
+Any UI-generating skill should declare lookbook as a precondition. One-way: it
+does not import lookbook, wrap it, or reimplement it.
 
 ```markdown
 ## Before generating any UI
@@ -214,29 +246,37 @@ it, wrap it, or reimplement it.
 4. Read every image in `references[]` before writing markup.
 ```
 
----
-
-## 10. Build order
-
-Each step is independently testable. Do not start the UI until step 2 passes.
-
-1. `schema.py` — write, read, validate. No server, no UI.
-2. Headless flags (`--preset`, `--accent`). This proves the whole contract
-   end-to-end with zero frontend.
-3. Server: port walk, token auth, origin check, detached launch, timeout.
-4. `index.html` with the five presets.
-5. Upload path and custom instructions.
-6. Trigger evals, then package as `.skill`.
+The schema is versioned. A v1 file is migrated on read rather than rejected, so
+an existing install keeps its look and is never sent back to the picker, and
+every field added since is optional so older consumers keep working.
 
 ---
 
-## 11. Open questions
+## Layout
 
-- **graphify integration.** What does it map, and what does it emit? That decides
-  whether it needs the full token set or only colour.
-- Should lookbook also write `branding.css` (CSS custom properties) and a
-  Tailwind config fragment to disk, or stay format-agnostic?
-- What exactly makes an existing `branding.json` "invalid"? Schema mismatch only,
-  or also a missing referenced image?
-- Headless installs: is `--print-url` enough for SSH users, or does the flag path
-  need an interactive terminal fallback?
+```
+.claude-plugin/     plugin and marketplace manifests
+commands/           the /lookbook slash command
+lookbook/           the picker skill
+  scripts/          pick.py (CLI and server), schema.py (tokens and validation)
+  assets/ui/        one HTML file, inline CSS and JS, no build step
+  references/       full token tables per preset
+mark/               the logo and favicon skill
+  scripts/          mark.py, fonts.py, imgio.py, raster.py
+```
+
+## Support
+
+lookbook is free and always will be, and nothing in it is gated. If it saved
+you an afternoon of arguing with a model about fonts, you are welcome to buy me
+a coffee. Entirely optional, and genuinely appreciated.
+
+<a href="https://ko-fi.com/jalonlivan">
+  <img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white" alt="Buy me a coffee on Ko-fi">
+</a>
+
+Starring the repo or telling someone about it helps just as much.
+
+## License
+
+MIT.

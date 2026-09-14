@@ -38,7 +38,7 @@ Exit 0 on success, exit 3 on bad arguments or an unwritable target.
 
 1. **Check `.claude/branding.json`.** If it exists, colours, the display font
    and the corner radius all come from it and the mark matches the rest of the
-   site for free. If it does not, run lookbook first — or pass `--bg`/`--fg`
+   site for free. If it does not, run lookbook first, or pass `--bg`/`--fg`
    explicitly.
 2. **Ask which mode.** Do not guess. A user who has a logo file wants `image`;
    a user naming their product wants `text`; a user with neither wants `shape`.
@@ -64,7 +64,7 @@ Override with `--out`.
 | --- | --- |
 | `favicon.ico` | 16, 32 and 48 in one container, for the browser tab |
 | `favicon-16x16.png` `favicon-32x32.png` `favicon-48x48.png` | modern tab icons |
-| `apple-touch-icon.png` | 180px, **flattened opaque** — iOS composites alpha onto black |
+| `apple-touch-icon.png` | 180px, **flattened opaque**, since iOS composites alpha onto black |
 | `icon-192.png` `icon-512.png` | PWA / Android |
 | `icon-maskable-512.png` | extra safe-zone padding; Android crops icons to a circle |
 | `mark.png` `mark.svg` | the bare square mark, transparent, no plate |
@@ -74,7 +74,7 @@ Override with `--out`.
 | `head.html` | the `<link>` tags to paste into `<head>` |
 
 The SVGs carry **real outline paths**, not `<text>` elements, so they render
-identically everywhere without the font installed. Image mode produces no SVG —
+identically everywhere without the font installed. Image mode produces no SVG, because
 rasters cannot be vectorised.
 
 Existing files are never overwritten silently: the run stops and lists them.
@@ -152,7 +152,7 @@ One-way, in the direction lookbook's spec describes: mark reads
 3. Read the tokens. Use them exactly.
 ```
 
-Nothing here depends on lookbook being installed — without a branding file,
+Nothing here depends on lookbook being installed. Without a branding file,
 mark falls back to a neutral dark plate and says so.
 
 ---
@@ -177,7 +177,7 @@ independently testable:
   work, including composite glyphs and variable-font default instances.
 - **JPEG and WebP input are rejected.** JPEG has no alpha and its ringing lands
   exactly on the hard edges a logo is made of. The error names the fix.
-- **SVG input is rejected** — rasterising it would need a full SVG engine.
+- **SVG input is rejected**, since rasterising it would need a full SVG engine.
 - **No kerning.** `hmtx` advances only; `GPOS` is not read. `--tracking` is the
   knob a logo actually needs.
 - **No hinting.** 16px icons are box-filtered down from a large master, which is
@@ -189,7 +189,7 @@ independently testable:
   never the subfamily string. On a localised Windows that string reads
   "Negreta", not "Bold", and string matching silently fails.
 - The name table is read preferring the US-English record for the same reason.
-- Font discovery reads only the table directory plus `name` and `OS/2` — reading
+- Font discovery reads only the table directory plus `name` and `OS/2`, because reading
   each file whole to list families cost seconds, and `glyf` is never consulted.
 - Downsampling goes through a mip pyramid with alpha premultiplied once.
   Resampling each size straight from the master was ~7× slower, and

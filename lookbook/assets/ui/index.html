@@ -67,12 +67,30 @@ header{
 .tag h1{font-size:15px;font-weight:600;margin:0 0 4px}
 .tag p{margin:0;color:var(--muted);font-size:12.5px;max-width:58ch}
 .tag code{font-family:var(--mono);font-size:11.5px;color:var(--text)}
+.head-right{
+  margin-left:auto;align-self:center;display:flex;align-items:center;
+  gap:9px;flex-wrap:wrap;justify-content:flex-end;
+}
 .proj{
-  align-self:center;font-family:var(--mono);font-size:11px;color:var(--faint);
+  font-family:var(--mono);font-size:11px;color:var(--faint);
   border:1px solid var(--border);border-radius:var(--r);padding:5px 9px;
   white-space:nowrap;background:var(--sunken);
 }
 .proj b{color:var(--muted);font-weight:500}
+/* Quiet until you look at it, then it becomes the same button as everything
+   else. Nobody is being asked for anything. */
+.kofi{
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  font-size:11.5px;font-weight:600;text-decoration:none;
+  color:var(--muted);background:var(--sunken);
+  border:1px solid var(--border);border-radius:var(--r);padding:6px 10px;
+  transition:color .14s ease,background .14s ease,border-color .14s ease,box-shadow .14s ease;
+}
+.kofi svg{width:13px;height:13px;flex:0 0 auto}
+.kofi:hover,.kofi:focus-visible{
+  color:#FFF4E9;background:var(--btn);border-color:var(--accent);
+  box-shadow:var(--glow);outline:none;
+}
 
 /* ---------- layout ---------- */
 .cols{display:grid;grid-template-columns:minmax(0,1fr) 352px;gap:26px;align-items:start}
@@ -335,7 +353,22 @@ details.tune>summary:hover{color:var(--muted)}
       <p>Choose a look, tune it, drop in references. lookbook writes
          <code>.claude/branding.json</code> and every UI skill in this project reads it.</p>
     </div>
-    <div class="proj" id="projName"></div>
+    <div class="head-right">
+      <a class="kofi" href="https://ko-fi.com/jalonlivan"
+         target="_blank" rel="noopener noreferrer"
+         title="lookbook is free. If it saved you time, a coffee is appreciated.">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M17 8h1a4 4 0 0 1 0 8h-1"/>
+          <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/>
+          <line x1="6" y1="2" x2="6" y2="4"/>
+          <line x1="10" y1="2" x2="10" y2="4"/>
+          <line x1="14" y1="2" x2="14" y2="4"/>
+        </svg>
+        Buy me a coffee
+      </a>
+      <div class="proj" id="projName"></div>
+    </div>
   </header>
 
   <div class="cols">
@@ -884,7 +917,7 @@ function uploadFiles(list){
         if (!r.ok){ setStatus(r.error || "upload failed", true); return; }
         refs.push({path:r.path, note:"", url:URL.createObjectURL(f)});
         renderRefs(); setStatus("");
-      })["catch"](function(){ setStatus("upload failed — server gone?", true); });
+      })["catch"](function(){ setStatus("upload failed, is the server gone?", true); });
     };
     reader.readAsArrayBuffer(f);
   });
@@ -964,7 +997,7 @@ function finish(title){
   q("#doneTitle").textContent = title;
   q("#app").classList.add("hidden");
   q("#done").classList.remove("hidden");
-  document.title = "lookbook — done";
+  document.title = "lookbook: done";
 }
 
 function submitStatic(){
@@ -998,7 +1031,7 @@ function submit(){
     finish(preset(selected).label + " locked.");
   })["catch"](function(){
     busy = false; q("#submit").disabled = false;
-    setStatus("server unreachable — it may have timed out", true);
+    setStatus("server unreachable, it may have timed out", true);
   });
 }
 
@@ -1144,7 +1177,7 @@ function selectCmd(){
   var sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(range);
-  q("#copyCmd").textContent = "Selected — press Ctrl+C";
+  q("#copyCmd").textContent = "Selected, press Ctrl+C";
 }
 
 if (MODE === "static"){
