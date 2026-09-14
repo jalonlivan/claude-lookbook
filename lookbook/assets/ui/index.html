@@ -50,6 +50,9 @@ a{color:var(--accent)}
 }
 .banner b{color:var(--accent);font-weight:600}
 .hidden{display:none!important}
+/* .sec-label is display:flex and .grid is display:grid, both of which beat the
+   UA rule for [hidden]. Without this, setting el.hidden does nothing. */
+[hidden]{display:none!important}
 
 .wrap{max-width:1220px;margin:0 auto;padding:0 20px 64px}
 
@@ -91,12 +94,71 @@ header{
 .card:hover{border-color:#4a423d;box-shadow:var(--glow-soft)}
 .card:focus-visible,.card[aria-checked="true"]{border-color:var(--accent);box-shadow:var(--glow)}
 
+/* ---------- ground chooser: step one ---------- */
+.grounds{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px}
+@media (max-width:560px){.grounds{grid-template-columns:1fr}}
+.ground{
+  position:relative;overflow:hidden;cursor:pointer;text-align:left;
+  border:1px solid var(--border);border-radius:var(--r);padding:0;
+  background:var(--surface);font-family:var(--sans);
+  transition:box-shadow .14s ease,border-color .14s ease;
+}
+.ground:hover{border-color:#4a423d;box-shadow:var(--glow-soft)}
+.ground[aria-pressed="true"]{border-color:var(--accent);box-shadow:var(--glow)}
+.ground:focus-visible{box-shadow:var(--glow);outline:none}
+.ground-art{
+  display:block;height:88px;position:relative;overflow:hidden;
+  border-bottom:1px solid var(--border);
+}
+.ground-art.is-light{background:#FBF9F6}
+.ground-art.is-dark{background:#07070A}
+.ground-art i{position:absolute;display:block}
+/* a hint of the thing being chosen: pigment sits in the ink, light in the glow */
+.ground-art.is-light i{
+  left:18px;top:24px;width:96px;height:8px;border-radius:2px;background:#C2603F;
+}
+.ground-art.is-light i+i{top:42px;width:150px;height:6px;background:#D9CFC7}
+.ground-art.is-light i+i+i{top:58px;width:110px;height:6px;background:#E4DDD7}
+.ground-art.is-dark i{
+  left:50%;top:50%;width:190px;height:190px;margin:-95px 0 0 -95px;border-radius:50%;
+  background:radial-gradient(circle,#A855F7 0%,#4C1D95 38%,transparent 68%);
+  opacity:.85;filter:blur(6px);
+}
+.ground-art.is-dark i+i{
+  left:22px;top:34px;width:82px;height:9px;margin:0;border-radius:2px;
+  background:#F4F1FA;filter:none;opacity:1;
+}
+.ground-art.is-dark i+i+i{
+  left:22px;top:52px;width:130px;height:6px;margin:0;border-radius:2px;
+  background:rgba(255,255,255,.28);filter:none;opacity:1;
+}
+.ground-meta{display:block;padding:11px 13px 12px}
+.ground-meta h3{margin:0 0 3px;font-size:13px;font-weight:600;color:var(--text)}
+.ground-meta p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.45}
+.ground-meta span{
+  display:block;margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--faint);
+}
+
 /* the preview renders in the preset's OWN tokens -- that is the whole point */
 .pv{
   background:var(--p-bg);color:var(--p-text);padding:15px 15px 14px;min-height:162px;
   border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px;
-  font-family:var(--p-body);
+  font-family:var(--p-body);position:relative;isolation:isolate;
 }
+/* Lighting is the primary variable in the dark family and the first thing a
+   small thumbnail loses, so the preview renders it rather than describing it. */
+.pv-light,.pv-grain{position:absolute;inset:0;pointer-events:none;z-index:-1}
+.pv-light{background:var(--p-light,none);opacity:var(--p-light-op,0)}
+.pv-grain{
+  opacity:var(--p-grain,0);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.pv-word{font-family:var(--p-word,inherit);font-style:var(--p-word-style,normal)}
+.pv-code{
+  font-family:var(--p-mono);font-size:9.5px;letter-spacing:-.01em;
+  color:var(--p-muted);opacity:.9;
+}
+.pv-code b{color:var(--p-accent);font-weight:400}
 .pv-bar{display:flex;gap:4px}
 .pv-bar i{width:7px;height:7px;border-radius:var(--p-r);background:var(--p-border);display:block}
 .pv-h{
@@ -118,6 +180,10 @@ header{
 .meta{padding:11px 13px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
 .meta h3{margin:0;font-size:13px;font-weight:600}
 .meta p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.45}
+.pv-note{
+  font-size:10.5px!important;line-height:1.45;color:var(--accent)!important;
+  border-left:2px solid var(--accent);padding-left:7px;margin:1px 0 0!important;
+}
 .fonts{font-family:var(--mono);font-size:10px;color:var(--faint)}
 .sw{display:flex;gap:3px;margin-top:auto;padding-top:4px}
 .sw i{width:15px;height:15px;border-radius:2px;display:block;border:1px solid rgba(245,230,211,.14)}
@@ -274,8 +340,29 @@ details.tune>summary:hover{color:var(--muted)}
 
   <div class="cols">
     <section>
-      <p class="sec-label">The looks</p>
+      <p class="sec-label">The ground</p>
+      <div class="grounds" id="grounds">
+        <button class="ground" type="button" data-ground="light" aria-pressed="false">
+          <span class="ground-art is-light"><i></i><i></i><i></i></span>
+          <span class="ground-meta">
+            <h3>Light ground</h3>
+            <p>Colour in the ink. A pale ground, a pigment accent, elevation by shadow.</p>
+            <span id="countLight"></span>
+          </span>
+        </button>
+        <button class="ground" type="button" data-ground="dark" aria-pressed="false">
+          <span class="ground-art is-dark"><i></i><i></i><i></i></span>
+          <span class="ground-meta">
+            <h3>Dark ground</h3>
+            <p>Colour in the emission. A dark ground lit by one source, elevation by hairline border.</p>
+            <span id="countDark"></span>
+          </span>
+        </button>
+      </div>
+
+      <p class="sec-label" id="looksLabel">The looks</p>
       <div class="grid" id="grid" role="radiogroup" aria-label="Visual direction"></div>
+      <p class="note" id="groundHint">Pick a ground to see the looks built on it.</p>
       <div class="fontsw">
         <input type="checkbox" id="webfonts">
         <label for="webfonts">Load the real fonts from Google Fonts for an accurate preview
@@ -395,6 +482,7 @@ var EMBEDDED = __LOOKBOOK_DATA__;    // presets inlined when there is no server
 function q(s){ return document.querySelector(s); }
 
 var PRESETS = [];
+var ground = null;        // "light" | "dark" -- step one
 var selected = null;      // preset name
 var overrides = {};       // name -> {color:{}, type:{}, radius:{}, spacing:{}, shadow}
 var refs = [];            // {path, note, url}
@@ -481,15 +569,53 @@ function stack(family){
 // ---------------------------------------------------------------- cards
 var CARD_HTML =
     '<div class="pv">'
+  +   '<div class="pv-light"></div><div class="pv-grain"></div>'
   +   '<div class="pv-bar"><i></i><i></i><i></i></div>'
   +   '<div class="pv-h">Ship the thing</div>'
   +   '<div class="pv-p">Body copy at a real size, so the face and its rhythm are '
   +     'visible before anything gets built.</div>'
+  +   '<div class="pv-code"></div>'
   +   '<div class="pv-rules"><i></i><i></i><i></i></div>'
   +   '<div class="pv-row"><span class="pv-btn">Get started</span>'
   +     '<span class="pv-link">Read the docs &rarr;</span></div>'
   + '</div>'
-  + '<div class="meta"><h3></h3><p></p><div class="fonts"></div><div class="sw"></div></div>';
+  + '<div class="meta"><h3></h3><p></p><p class="pv-note" hidden></p>'
+  +   '<div class="fonts"></div><div class="sw"></div></div>';
+
+// Turn a lighting token into something the preview can actually show.
+var LIGHT_POS = {
+  "center":"50% 50%", "top":"50% 0%", "bottom":"50% 100%",
+  "left":"0% 50%", "right":"100% 50%",
+  "top-left":"12% 10%", "top-right":"88% 10%",
+  "bottom-left":"14% 92%", "bottom-right":"86% 92%", "diagonal":"25% 80%"
+};
+function lightingCss(lighting, ground){
+  var none = {image:"none", opacity:0};
+  if (!lighting || lighting.type === "none" || !lighting.hue || !lighting.hue.length) return none;
+  var pos = LIGHT_POS[lighting.position] || "50% 50%";
+  var hue = lighting.hue;
+  var op = Math.max(0, Math.min(1, lighting.intensity));
+
+  if (lighting.type === "spot"){
+    // A spot is a tight halo around one object, not a wash over the whole page.
+    // Sizing the ellipse in percentages keeps it that way at any card size.
+    var stops = hue.map(function(h, i){
+      return h + " " + Math.round(i * (52 / Math.max(1, hue.length - 1))) + "%";
+    }).join(", ");
+    return {
+      image:"radial-gradient(ellipse 40% 50% at " + pos + ", " + stops + ", transparent 74%)",
+      opacity:op
+    };
+  }
+  if (lighting.type === "field"){
+    // A field is meant to occupy a third of the viewport, so it stays large.
+    return {image:"radial-gradient(ellipse 115% 72% at " + pos + ", "
+      + hue[0] + " 0%, " + (hue[1] || hue[0]) + " 42%, transparent 82%)", opacity:op};
+  }
+  // wash: ambient, no source, so it runs the full height from the cast colour
+  return {image:"linear-gradient(to bottom, transparent 0%, "
+    + (ground && ground.cast ? ground.cast : hue[0]) + " 100%)", opacity:op};
+}
 
 function paintCard(el, name){
   var t = tokensFor(name);
@@ -505,8 +631,32 @@ function paintCard(el, name){
   pv.style.setProperty("--p-body", stack(t.type.body.family));
   pv.style.setProperty("--p-dw", String(t.type.display.weights[t.type.display.weights.length-1]));
   pv.style.setProperty("--p-shadow", t.shadow === "none" ? "none" : t.shadow);
+  pv.style.setProperty("--p-mono", stack((t.type.mono || {}).family || "monospace"));
 
-  el.querySelector(".fonts").textContent = t.type.display.family + " · " + t.type.body.family;
+  var lit = lightingCss(t.lighting, t.ground);
+  pv.style.setProperty("--p-light", lit.image);
+  pv.style.setProperty("--p-light-op", String(lit.opacity));
+  pv.style.setProperty("--p-grain", t.lighting && t.lighting.grain ? "0.22" : "0");
+
+  // One word in the accent face, which is the whole point of that token.
+  var word = t.type.accentWord;
+  var head = pv.querySelector(".pv-h");
+  if (word && word.family){
+    pv.style.setProperty("--p-word", stack(word.family));
+    pv.style.setProperty("--p-word-style", word.style || "italic");
+    head.innerHTML = 'Ship the <span class="pv-word">thing</span>';
+  } else {
+    head.textContent = "Ship the thing";
+  }
+
+  // Every one of these sites shows code; an unconsidered mono is instantly wrong.
+  var code = pv.querySelector(".pv-code");
+  code.hidden = t.density === "console";
+  code.innerHTML = '<b>const</b> ship = true';
+
+  el.querySelector(".fonts").textContent =
+    t.type.display.family + " · " + t.type.body.family
+    + (t.type.mono ? " · " + t.type.mono.family : "");
 
   var sw = el.querySelector(".sw");
   sw.innerHTML = "";
@@ -518,10 +668,33 @@ function paintCard(el, name){
   });
 }
 
+// Ten looks in one flat grid is worse than five: half the thumbnails would be
+// dark rectangles telling you apart only by glow colour. Ground first.
+function presetsForGround(){
+  return PRESETS.filter(function(p){
+    return p.mode === ground || p.name === "custom";  // custom belongs to both
+  });
+}
+
+function setGround(next, focus){
+  ground = next;
+  var buttons = document.querySelectorAll(".ground");
+  for (var i = 0; i < buttons.length; i++){
+    buttons[i].setAttribute("aria-pressed", buttons[i].dataset.ground === next ? "true" : "false");
+  }
+  q("#groundHint").hidden = true;
+  q("#looksLabel").hidden = false;
+  q("#grid").hidden = false;
+  renderGrid();
+  var list = presetsForGround();
+  var keep = list.filter(function(p){ return p.name === selected; });
+  select(keep.length ? selected : list[0].name, focus);
+}
+
 function renderGrid(){
   var grid = q("#grid");
   grid.innerHTML = "";
-  PRESETS.forEach(function(p){
+  presetsForGround().forEach(function(p){
     var el = document.createElement("div");
     el.className = "card";
     el.setAttribute("role", "radio");
@@ -531,6 +704,11 @@ function renderGrid(){
     el.innerHTML = CARD_HTML;
     el.querySelector(".meta h3").textContent = p.label;
     el.querySelector(".meta p").textContent = p.blurb;
+    if (p.note){
+      var n = el.querySelector(".pv-note");
+      n.textContent = p.note;
+      n.hidden = false;
+    }
     el.addEventListener("click", function(){ select(p.name); });
     el.addEventListener("keydown", function(e){
       if (e.key === " " || e.key === "Enter"){ e.preventDefault(); select(p.name); }
@@ -538,15 +716,19 @@ function renderGrid(){
     grid.appendChild(el);
     paintCard(el, p.name);
   });
-  grid.addEventListener("keydown", function(e){
-    if (["ArrowRight","ArrowDown","ArrowLeft","ArrowUp"].indexOf(e.key) < 0) return;
-    e.preventDefault();
-    var i = 0;
-    PRESETS.forEach(function(p, n){ if (p.name === selected) i = n; });
-    var d = (e.key === "ArrowRight" || e.key === "ArrowDown") ? 1 : -1;
-    select(PRESETS[(i + d + PRESETS.length) % PRESETS.length].name, true);
-  });
 }
+
+// Attached once, not per render: renderGrid runs again on every ground switch,
+// and a listener added there would stack up and move the selection twice.
+q("#grid").addEventListener("keydown", function(e){
+  if (["ArrowRight","ArrowDown","ArrowLeft","ArrowUp"].indexOf(e.key) < 0) return;
+  e.preventDefault();
+  var list = presetsForGround();   // arrows stay inside the chosen ground
+  var i = 0;
+  list.forEach(function(p, n){ if (p.name === selected) i = n; });
+  var d = (e.key === "ArrowRight" || e.key === "ArrowDown") ? 1 : -1;
+  select(list[(i + d + list.length) % list.length].name, true);
+});
 function repaint(){
   var el = q('.card[data-name="' + selected + '"]');
   if (el) paintCard(el, selected);
@@ -554,6 +736,7 @@ function repaint(){
 
 function select(name, focus){
   selected = name;
+  if (!busy) q("#submit").disabled = false;
   var cards = document.querySelectorAll(".card");
   for (var i = 0; i < cards.length; i++){
     var on = cards[i].dataset.name === name;
@@ -924,8 +1107,21 @@ q("#submit").addEventListener("click", submit);
 function boot(presets, project){
   PRESETS = presets;
   q("#projName").innerHTML = "project&nbsp;&nbsp;<b>" + esc(project) + "</b>";
-  renderGrid();
-  select(PRESETS[0].name);
+
+  var nLight = PRESETS.filter(function(p){ return p.mode === "light"; }).length;
+  var nDark = PRESETS.filter(function(p){ return p.mode === "dark"; }).length;
+  q("#countLight").textContent = nLight + " looks";
+  q("#countDark").textContent = nDark + " looks";
+
+  // Step one is a real step: nothing to choose from until a ground is picked,
+  // and nothing to submit either.
+  q("#grid").hidden = true;
+  q("#looksLabel").hidden = true;
+  q("#submit").disabled = true;
+
+  document.querySelectorAll(".ground").forEach(function(btn){
+    btn.addEventListener("click", function(){ setGround(btn.dataset.ground, true); });
+  });
 }
 
 q("#copyCmd").addEventListener("click", function(){

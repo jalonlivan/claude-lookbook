@@ -12,12 +12,51 @@ import os
 import re
 from typing import Any
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 CONFIG_RELPATH = os.path.join(".claude", "branding.json")
 REFS_RELDIR = os.path.join(".claude", "branding", "refs")
 
 HEX_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+LENGTH_RE = re.compile(r"^\d+(?:\.\d+)?(px|rem|%)$")
+DURATION_RE = re.compile(r"^\d+(?:\.\d+)?(ms|s)$")
+
+# --------------------------------------------------------------------------
+# v2 vocabulary
+#
+# Two preset families. `pigment` looks put the colour in the ink: a light
+# ground, a coloured accent, elevation by shadow. `dark-dev` looks put the
+# colour in the emission: a dark ground, one light source, elevation by 1px
+# hairline border. That is a different thing from "dark mode", which is only a
+# colour inversion, and it is why the family gets its own axis rather than five
+# more cards in the same grid.
+# --------------------------------------------------------------------------
+
+MODES = ("light", "dark")
+FAMILIES = ("pigment", "dark-dev")
+
+# How the page is lit. The primary variable in the dark-dev family.
+LIGHTING_TYPES = (
+    "none",   # flat. app chrome.
+    "spot",   # one object lit from behind
+    "field",  # a large aurora or bloom occupying a third of the viewport
+    "wash",   # ambient page-level gradient with no visible source
+)
+LIGHT_POSITIONS = (
+    "center", "top", "bottom", "left", "right",
+    "top-left", "top-right", "bottom-left", "bottom-right", "diagonal",
+)
+
+# Where elevation comes from. "border" is the highest-leverage token in the
+# dark-dev family: getting shadows out of the output does more than any colour.
+ELEVATIONS = ("border", "shadow", "both")
+
+DENSITIES = ("marketing", "catalog", "console")
+
+MOTION_LOADS = ("none", "fade", "staggered")
+MOTION_MICRO = ("minimal", "standard", "expressive")
+
+DEFAULT_MONO = "IBM Plex Mono"
 
 # --------------------------------------------------------------------------
 # Presets
@@ -173,6 +212,7 @@ PRESETS: dict[str, dict[str, Any]] = {
             "radius": {"sm": "2px", "md": "4px", "lg": "6px"},
             "spacing": {"base": 4},
             "shadow": "0 1px 2px rgba(24,24,27,0.06)",
+            "density": "console",
         },
         "avoid": [
             "Inter, Roboto, DM Sans",
@@ -182,6 +222,345 @@ PRESETS: dict[str, dict[str, Any]] = {
             "decorative hero sections",
             "tables without loading, empty and error states",
             "spacing above 24px between related controls",
+        ],
+    },
+    # ----------------------------------------------------------------------
+    # dark-dev family. A dark ground, lit by a light source, with the interface
+    # built out of borders instead of shadows.
+    # ----------------------------------------------------------------------
+    "console": {
+        "label": "Console",
+        "blurb": "Flat dark app chrome, hairline borders, one restrained accent, full state coverage.",
+        "mode": "dark",
+        "family": "dark-dev",
+        "tokens": {
+            "color": {
+                "bg": "#0C0C0E",
+                "surface": "#16161A",
+                "text": "#ECECEE",
+                "muted": "#94949B",
+                "accent": "#7F56D9",
+                "border": "#26262B",
+            },
+            "ground": {"base": "#0C0C0E", "cast": None},
+            "lighting": {
+                "type": "none",
+                "hue": [],
+                "intensity": 0.0,
+                "position": None,
+                "grain": False,
+            },
+            "surface": {
+                "elevation": "border",
+                "border": "rgba(255,255,255,0.08)",
+                "raise": "rgba(255,255,255,0.03)",
+            },
+            "type": {
+                "display": {"family": "Geist", "weights": [500, 600]},
+                "body": {"family": "Geist", "weights": [400, 500]},
+                "mono": {"family": "Geist Mono", "weights": [400]},
+                "accentWord": None,
+                "scale": [11, 12, 13, 14, 16, 20, 28],
+            },
+            "radius": {"sm": "4px", "md": "6px", "lg": "8px", "button": "6px"},
+            "spacing": {"base": 4},
+            "shadow": "none",
+            "density": "console",
+            "motion": {"load": "fade", "stagger": "0ms", "micro": "minimal"},
+        },
+        # An app needs a light mode; this look survives one.
+        "altMode": {
+            "mode": "light",
+            "color": {
+                "bg": "#FFFFFF",
+                "surface": "#FAFAFA",
+                "text": "#181D27",
+                "muted": "#535862",
+                "accent": "#7F56D9",
+                "border": "#E9EAEB",
+            },
+            "ground": {"base": "#FFFFFF", "cast": None},
+            "lighting": {
+                "type": "none",
+                "hue": [],
+                "intensity": 0.0,
+                "position": None,
+                "grain": False,
+            },
+            "surface": {
+                "elevation": "border",
+                "border": "rgba(0,0,0,0.08)",
+                "raise": "rgba(0,0,0,0.02)",
+            },
+        },
+        "avoid": [
+            "Inter, Roboto, DM Sans",
+            "em dashes in headings or body copy",
+            "drop shadows for elevation; this family lifts with 1px hairline borders",
+            "marketing-scale type; body text stays at 13-14px",
+            "tables without loading, empty, error and disabled states",
+            "decorative gradients; this preset is deliberately unlit",
+            "accent colour anywhere except selection and the primary action",
+        ],
+    },
+    "void": {
+        "label": "Void",
+        "blurb": "Pure black, one spotlit chromatic object, geometric grotesk, pill buttons, logo wall.",
+        "mode": "dark",
+        "family": "dark-dev",
+        "tokens": {
+            "color": {
+                "bg": "#000000",
+                "surface": "#0A0A0A",
+                "text": "#EDEDED",
+                "muted": "#A1A1A1",
+                "accent": "#FFFFFF",
+                "border": "#2E2E2E",
+            },
+            "ground": {"base": "#000000", "cast": None},
+            "lighting": {
+                "type": "spot",
+                "hue": ["#FF0080", "#7928CA", "#0070F3", "#50E3C2"],
+                "intensity": 0.75,
+                "position": "center",
+                "grain": False,
+            },
+            "surface": {
+                "elevation": "border",
+                "border": "rgba(255,255,255,0.10)",
+                "raise": "rgba(255,255,255,0.03)",
+            },
+            "type": {
+                "display": {"family": "Geist", "weights": [400, 600]},
+                "body": {"family": "Geist", "weights": [400, 500]},
+                "mono": {"family": "Geist Mono", "weights": [400]},
+                "accentWord": None,
+                "scale": [12, 14, 16, 20, 32, 56, 96],
+            },
+            "radius": {"sm": "4px", "md": "8px", "lg": "12px", "button": "999px"},
+            "spacing": {"base": 8},
+            "shadow": "none",
+            "density": "marketing",
+            "motion": {"load": "staggered", "stagger": "60ms", "micro": "minimal"},
+        },
+        "altMode": {
+            "mode": "light",
+            "color": {
+                "bg": "#FFFFFF",
+                "surface": "#FAFAFA",
+                "text": "#000000",
+                "muted": "#666666",
+                "accent": "#000000",
+                "border": "#EAEAEA",
+            },
+            "ground": {"base": "#FFFFFF", "cast": None},
+            "lighting": {
+                "type": "spot",
+                "hue": ["#FF0080", "#7928CA", "#0070F3", "#50E3C2"],
+                "intensity": 0.35,
+                "position": "center",
+                "grain": False,
+            },
+            "surface": {
+                "elevation": "border",
+                "border": "rgba(0,0,0,0.08)",
+                "raise": "rgba(0,0,0,0.02)",
+            },
+        },
+        "avoid": [
+            "Inter, Roboto, DM Sans",
+            "em dashes in headings or body copy",
+            "drop shadows for elevation; this family lifts with 1px hairline borders",
+            "a second lit element; one object glows and nothing else does",
+            "colour anywhere but the glow and the logo wall stays monochrome",
+            "timid type jumps; the scale steps 32 to 56 to 96 for a reason",
+            "off-black backgrounds; the ground is #000000 exactly",
+        ],
+    },
+    "bloom": {
+        "label": "Bloom",
+        "blurb": "Near-black with a grained aurora, monospace code panel, saturated pill CTA.",
+        # Shown under the card. Without it, the one preset that is deliberately
+        # purple looks like the bug this whole tool exists to prevent.
+        "note": "Purple on purpose. The avoid list forbids the default nobody "
+                "chose; picking this is the act of choosing.",
+        "mode": "dark",
+        "family": "dark-dev",
+        "tokens": {
+            "color": {
+                "bg": "#060507",
+                "surface": "#0F0D14",
+                "text": "#F4F1FA",
+                "muted": "#A1A1AA",
+                "accent": "#A855F7",
+                "border": "#241C33",
+            },
+            "ground": {"base": "#060507", "cast": "#1A0B2E"},
+            "lighting": {
+                "type": "field",
+                "hue": ["#A855F7", "#4C1D95"],
+                "intensity": 0.70,
+                "position": "bottom-left",
+                "grain": True,
+            },
+            "surface": {
+                "elevation": "border",
+                "border": "rgba(255,255,255,0.08)",
+                "raise": "rgba(255,255,255,0.04)",
+            },
+            "type": {
+                "display": {"family": "Instrument Sans", "weights": [500, 700]},
+                "body": {"family": "Instrument Sans", "weights": [400, 500]},
+                "mono": {"family": "Azeret Mono", "weights": [400, 500]},
+                "accentWord": None,
+                "scale": [12, 14, 16, 20, 30, 48, 80],
+            },
+            "radius": {"sm": "6px", "md": "10px", "lg": "16px", "button": "999px"},
+            "spacing": {"base": 8},
+            "shadow": "none",
+            "density": "marketing",
+            "motion": {"load": "staggered", "stagger": "60ms", "micro": "standard"},
+        },
+        # The aurora is the identity. On white it is not the same look.
+        "altMode": None,
+        # Purple is deliberate here and only here, so the indigo/violet line is
+        # absent from this list by design. The avoid list forbids the default
+        # nobody chose; picking this preset is the act of choosing.
+        "avoid": [
+            "Inter, Roboto, DM Sans",
+            "em dashes in headings or body copy",
+            "drop shadows for elevation; this family lifts with 1px hairline borders",
+            "a clean gradient; the aurora needs grain or it bands and reads cheap",
+            "a second aurora; one light source only",
+            "syntax themes that fight the accent; the code panel stays near-monochrome",
+        ],
+    },
+    "platform": {
+        "label": "Platform",
+        "blurb": "Deep navy, soft glow behind dimensional objects, one saturated CTA that is not the glow.",
+        "mode": "dark",
+        "family": "dark-dev",
+        "tokens": {
+            "color": {
+                "bg": "#0D1117",
+                "surface": "#161B22",
+                "text": "#F0F6FC",
+                "muted": "#8B949E",
+                "accent": "#2DA44E",
+                "border": "#30363D",
+            },
+            "ground": {"base": "#0D1117", "cast": "#2A1A5E"},
+            "lighting": {
+                "type": "spot",
+                "hue": ["#A371F7", "#DB6BCB"],
+                "intensity": 0.55,
+                "position": "center",
+                "grain": False,
+            },
+            "surface": {
+                "elevation": "border",
+                "border": "rgba(255,255,255,0.10)",
+                "raise": "rgba(255,255,255,0.04)",
+            },
+            "type": {
+                "display": {"family": "Mona Sans", "weights": [500, 700]},
+                "body": {"family": "Mona Sans", "weights": [400, 600]},
+                "mono": {"family": "JetBrains Mono", "weights": [400, 500]},
+                "accentWord": None,
+                "scale": [12, 14, 16, 20, 28, 44, 72],
+            },
+            "radius": {"sm": "4px", "md": "6px", "lg": "12px", "button": "6px"},
+            "spacing": {"base": 8},
+            "shadow": "none",
+            "density": "marketing",
+            "motion": {"load": "staggered", "stagger": "60ms", "micro": "minimal"},
+        },
+        "altMode": {
+            "mode": "light",
+            "color": {
+                "bg": "#FFFFFF",
+                "surface": "#F6F8FA",
+                "text": "#1F2328",
+                "muted": "#59636E",
+                "accent": "#1F883D",
+                "border": "#D1D9E0",
+            },
+            "ground": {"base": "#FFFFFF", "cast": None},
+            "lighting": {
+                "type": "spot",
+                "hue": ["#A371F7", "#DB6BCB"],
+                "intensity": 0.30,
+                "position": "center",
+                "grain": False,
+            },
+            "surface": {
+                "elevation": "border",
+                "border": "rgba(0,0,0,0.10)",
+                "raise": "rgba(0,0,0,0.03)",
+            },
+        },
+        "avoid": [
+            "Inter, Roboto, DM Sans",
+            "em dashes in headings or body copy",
+            "drop shadows for elevation; this family lifts with 1px hairline borders",
+            "an accent that matches the glow; the CTA colour and the light are different colours",
+            "pill-shaped buttons; this look uses a 6px rectangle",
+            "flat vector spot illustration; the lit objects read as dimensional",
+        ],
+    },
+    "gallery": {
+        "label": "Gallery",
+        "blurb": "Navy washing to blue, one italic serif word in a sans headline, a grid of work.",
+        "mode": "dark",
+        "family": "dark-dev",
+        "tokens": {
+            "color": {
+                "bg": "#070C18",
+                "surface": "#101827",
+                "text": "#F8FAFC",
+                "muted": "#94A3B8",
+                "accent": "#3B82F6",
+                "border": "#1E293B",
+            },
+            "ground": {"base": "#070C18", "cast": "#1D4ED8"},
+            "lighting": {
+                "type": "wash",
+                "hue": ["#1D4ED8", "#070C18"],
+                "intensity": 0.50,
+                "position": "bottom",
+                "grain": False,
+            },
+            "surface": {
+                "elevation": "border",
+                "border": "rgba(255,255,255,0.09)",
+                "raise": "rgba(255,255,255,0.03)",
+            },
+            "type": {
+                "display": {"family": "Instrument Sans", "weights": [500, 600]},
+                "body": {"family": "Instrument Sans", "weights": [400, 500]},
+                "mono": {"family": "IBM Plex Mono", "weights": [400]},
+                "accentWord": {
+                    "family": "Instrument Serif",
+                    "style": "italic",
+                    "use": "one word per headline, maximum",
+                },
+                "scale": [12, 14, 16, 20, 28, 44, 72],
+            },
+            "radius": {"sm": "4px", "md": "8px", "lg": "12px", "button": "999px"},
+            "spacing": {"base": 8},
+            "shadow": "none",
+            "density": "catalog",
+            "motion": {"load": "staggered", "stagger": "60ms", "micro": "minimal"},
+        },
+        # The navy-to-blue wash is the identity, not a theme setting.
+        "altMode": None,
+        "avoid": [
+            "Inter, Roboto, DM Sans",
+            "em dashes in headings or body copy",
+            "drop shadows for elevation; this family lifts with 1px hairline borders",
+            "the serif on more than one word per headline",
+            "a flat ground; the wash runs navy at the top to blue at the bottom",
+            "card grids without a filter row above them",
         ],
     },
     "custom": {
@@ -217,7 +596,78 @@ PRESETS: dict[str, dict[str, Any]] = {
     },
 }
 
+def _fill_v2_defaults(preset: dict[str, Any]) -> dict[str, Any]:
+    """Give every preset a complete v2 token set.
+
+    The pigment presets predate these groups, so rather than hand-copying eight
+    new keys into five dicts, they are derived once here from what those presets
+    already say. The same derivation is what migrates a v1 file on disk.
+    """
+    tokens = preset["tokens"]
+    color = tokens["color"]
+
+    preset.setdefault("mode", "dark" if _is_dark(color["bg"]) else "light")
+    preset.setdefault("family", "pigment")
+    preset.setdefault("altMode", None)
+
+    tokens.setdefault("ground", {"base": color["bg"], "cast": None})
+    tokens.setdefault(
+        "lighting",
+        {"type": "none", "hue": [], "intensity": 0.0, "position": None, "grain": False},
+    )
+    tokens.setdefault(
+        "surface",
+        {
+            # A preset that already declares a shadow lifts with shadow; one that
+            # does not was already lifting with its border.
+            "elevation": "shadow" if tokens.get("shadow", "none") != "none" else "border",
+            "border": color["border"],
+            "raise": color["surface"],
+        },
+    )
+
+    typ = tokens["type"]
+    if "mono" not in typ:
+        # A body face that is already monospaced is the preset's own mono.
+        body = typ["body"]["family"]
+        typ["mono"] = (
+            {"family": body, "weights": list(typ["body"]["weights"])}
+            if body.lower().endswith(("mono", "code"))
+            else {"family": DEFAULT_MONO, "weights": [400]}
+        )
+    typ.setdefault("accentWord", None)
+
+    tokens["radius"].setdefault("button", tokens["radius"]["md"])
+    tokens.setdefault("density", "marketing")
+    tokens.setdefault(
+        "motion", {"load": "fade", "stagger": "0ms", "micro": "minimal"}
+    )
+    return preset
+
+
+def _is_dark(hex_color: str) -> bool:
+    """Self-contained on purpose: this runs at import time, before the helper
+    section below has been defined."""
+    h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+
+    def lin(c: float) -> float:
+        c /= 255.0
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b) < 0.18
+
+
+for _p in PRESETS.values():
+    _fill_v2_defaults(_p)
+
 PRESET_NAMES = list(PRESETS.keys())
+
+# The ground-first picker asks for this before it asks for a look.
+DARK_PRESETS = [n for n, p in PRESETS.items() if p["mode"] == "dark"]
+LIGHT_PRESETS = [n for n, p in PRESETS.items() if p["mode"] == "light"]
 
 # Order matters: these are written to disk and read back by other skills.
 REQUIRED_COLORS = ("bg", "surface", "text", "muted", "accent", "border")
@@ -313,7 +763,10 @@ def build_config(
     doc: dict[str, Any] = {
         "schemaVersion": SCHEMA_VERSION,
         "preset": preset,
+        "mode": base["mode"],
+        "family": base["family"],
         "tokens": tokens,
+        "altMode": base["altMode"],
         "avoid": avoid,
         "references": references or [],
         "meta": {"createdAt": _utcnow(), "tool": "lookbook"},
@@ -327,18 +780,22 @@ def build_config(
 def _merge_tokens(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     """Shallow-per-group merge. Only known groups survive."""
     out = _deep_copy(base)
-    for group in ("color", "radius", "spacing"):
+    for group in ("color", "radius", "spacing", "ground", "lighting", "surface", "motion"):
         if isinstance(override.get(group), dict):
             out[group].update(override[group])
     if isinstance(override.get("type"), dict):
         t = override["type"]
-        for role in ("display", "body"):
+        for role in ("display", "body", "mono"):
             if isinstance(t.get(role), dict):
                 out["type"][role].update(t[role])
         if isinstance(t.get("scale"), list):
             out["type"]["scale"] = t["scale"]
-    if "shadow" in override and isinstance(override["shadow"], str):
+        if "accentWord" in t:
+            out["type"]["accentWord"] = t["accentWord"]
+    if isinstance(override.get("shadow"), str):
         out["shadow"] = override["shadow"]
+    if isinstance(override.get("density"), str):
+        out["density"] = override["density"]
     return out
 
 
@@ -415,11 +872,10 @@ def validate(doc: Any) -> dict[str, Any]:
 
     out = _deep_copy(doc)
 
-    version = out.get("schemaVersion")
-    if version != SCHEMA_VERSION:
-        raise SchemaError(
-            f"schemaVersion {version!r} is not supported (this build writes {SCHEMA_VERSION})"
-        )
+    # An older file is upgraded in place rather than rejected. A file from a
+    # *future* version is still refused, since half-understanding it would
+    # silently mis-render someone's brand.
+    out = migrate(out)
 
     preset = out.get("preset")
     if preset not in PRESETS:
@@ -440,7 +896,7 @@ def validate(doc: Any) -> dict[str, Any]:
     typ = tokens.get("type")
     if not isinstance(typ, dict):
         raise SchemaError("tokens.type must be an object")
-    for role in ("display", "body"):
+    for role in ("display", "body", "mono"):
         spec = typ.get(role)
         if not isinstance(spec, dict):
             raise SchemaError(f"tokens.type.{role} must be an object")
@@ -489,6 +945,59 @@ def validate(doc: Any) -> dict[str, Any]:
     if not isinstance(tokens.get("shadow"), str):
         raise SchemaError("tokens.shadow must be a string ('none' is valid)")
 
+    # ---- v2 groups ----
+    if out.get("mode") not in MODES:
+        raise SchemaError(f"mode must be one of {', '.join(MODES)}")
+    if out.get("family") not in FAMILIES:
+        raise SchemaError(f"family must be one of {', '.join(FAMILIES)}")
+
+    if not isinstance(typ.get("accentWord"), (dict, type(None))):
+        raise SchemaError("tokens.type.accentWord must be an object or null")
+    if isinstance(typ.get("accentWord"), dict):
+        word = typ["accentWord"]
+        if not isinstance(word.get("family"), str) or not word["family"].strip():
+            raise SchemaError("tokens.type.accentWord.family must be a non-empty string")
+        if word.get("style") not in ("normal", "italic"):
+            raise SchemaError("tokens.type.accentWord.style must be 'normal' or 'italic'")
+        word.setdefault("use", "one word per headline, maximum")
+
+    if "button" in radius:
+        val = radius["button"]
+        if not isinstance(val, str) or not LENGTH_RE.match(val):
+            raise SchemaError("tokens.radius.button must be a CSS length like '999px'")
+
+    if tokens.get("density") not in DENSITIES:
+        raise SchemaError(f"tokens.density must be one of {', '.join(DENSITIES)}")
+
+    motion = tokens.get("motion")
+    if not isinstance(motion, dict):
+        raise SchemaError("tokens.motion must be an object")
+    if motion.get("load") not in MOTION_LOADS:
+        raise SchemaError(f"tokens.motion.load must be one of {', '.join(MOTION_LOADS)}")
+    if motion.get("micro") not in MOTION_MICRO:
+        raise SchemaError(f"tokens.motion.micro must be one of {', '.join(MOTION_MICRO)}")
+    if not isinstance(motion.get("stagger"), str) or not DURATION_RE.match(motion["stagger"]):
+        raise SchemaError("tokens.motion.stagger must be a duration like '60ms'")
+
+    _validate_palette_groups(tokens, "tokens")
+
+    alt = out.get("altMode")
+    if alt is not None:
+        if not isinstance(alt, dict):
+            raise SchemaError("altMode must be an object or null")
+        if alt.get("mode") not in MODES:
+            raise SchemaError(f"altMode.mode must be one of {', '.join(MODES)}")
+        if alt["mode"] == out["mode"]:
+            raise SchemaError("altMode.mode must differ from the primary mode")
+        alt_color = alt.get("color")
+        if not isinstance(alt_color, dict):
+            raise SchemaError("altMode.color must be an object")
+        for key in REQUIRED_COLORS:
+            if key not in alt_color:
+                raise SchemaError(f"altMode.color.{key} is required")
+            alt_color[key] = normalize_hex(alt_color[key], f"altMode.color.{key}")
+        _validate_palette_groups(alt, "altMode")
+
     avoid = out.get("avoid")
     if not isinstance(avoid, list) or not all(isinstance(a, str) for a in avoid):
         raise SchemaError("avoid must be an array of strings")
@@ -513,6 +1022,86 @@ def validate(doc: Any) -> dict[str, Any]:
 # --------------------------------------------------------------------------
 # Read / write
 # --------------------------------------------------------------------------
+
+
+def _validate_palette_groups(holder: dict[str, Any], where: str) -> None:
+    """ground / lighting / surface. These three appear both in `tokens` and in
+    `altMode`, because they are exactly the groups that change with mode --
+    type, radius, spacing, density and motion do not."""
+    ground = holder.get("ground")
+    if not isinstance(ground, dict):
+        raise SchemaError(f"{where}.ground must be an object")
+    ground["base"] = normalize_hex(ground.get("base"), f"{where}.ground.base")
+    if ground.get("cast") is not None:
+        ground["cast"] = normalize_hex(ground["cast"], f"{where}.ground.cast")
+    else:
+        ground["cast"] = None
+
+    lighting = holder.get("lighting")
+    if not isinstance(lighting, dict):
+        raise SchemaError(f"{where}.lighting must be an object")
+    if lighting.get("type") not in LIGHTING_TYPES:
+        raise SchemaError(
+            f"{where}.lighting.type must be one of {', '.join(LIGHTING_TYPES)}"
+        )
+    hue = lighting.get("hue")
+    if not isinstance(hue, list) or len(hue) > 6:
+        raise SchemaError(f"{where}.lighting.hue must be an array of at most 6 colours")
+    lighting["hue"] = [
+        normalize_hex(h, f"{where}.lighting.hue[{i}]") for i, h in enumerate(hue)
+    ]
+    intensity = lighting.get("intensity")
+    if isinstance(intensity, bool) or not isinstance(intensity, (int, float)):
+        raise SchemaError(f"{where}.lighting.intensity must be a number 0-1")
+    if not 0.0 <= intensity <= 1.0:
+        raise SchemaError(f"{where}.lighting.intensity must be between 0 and 1")
+    if lighting.get("position") is not None and lighting["position"] not in LIGHT_POSITIONS:
+        raise SchemaError(
+            f"{where}.lighting.position must be null or one of {', '.join(LIGHT_POSITIONS)}"
+        )
+    if not isinstance(lighting.get("grain"), bool):
+        raise SchemaError(f"{where}.lighting.grain must be true or false")
+    # A lit page with no hue cannot be rendered; an unlit one must not claim a hue.
+    if lighting["type"] != "none" and not lighting["hue"]:
+        raise SchemaError(f"{where}.lighting.type is {lighting['type']!r} but hue is empty")
+    if lighting["type"] == "none" and lighting["intensity"]:
+        raise SchemaError(f"{where}.lighting is 'none' but intensity is not 0")
+
+    surface = holder.get("surface")
+    if not isinstance(surface, dict):
+        raise SchemaError(f"{where}.surface must be an object")
+    if surface.get("elevation") not in ELEVATIONS:
+        raise SchemaError(
+            f"{where}.surface.elevation must be one of {', '.join(ELEVATIONS)}"
+        )
+    for key in ("border", "raise"):
+        if not isinstance(surface.get(key), str) or not surface[key].strip():
+            raise SchemaError(f"{where}.surface.{key} must be a CSS colour string")
+
+
+def migrate(doc: dict[str, Any]) -> dict[str, Any]:
+    """Bring an older config up to the current schema.
+
+    v1 files predate every group the dark-dev family needs, so they are filled
+    from what the file already says rather than rejected. A v1 install that
+    upgrades keeps its look; it does not get sent back to the picker.
+    """
+    version = doc.get("schemaVersion")
+    if version == SCHEMA_VERSION:
+        return doc
+    if version != 1:
+        raise SchemaError(
+            f"schemaVersion {version!r} is not supported (this build writes {SCHEMA_VERSION})"
+        )
+
+    out = _deep_copy(doc)
+    out["schemaVersion"] = SCHEMA_VERSION
+    # _fill_v2_defaults derives every new group from the v1 body, which is the
+    # same derivation the shipped pigment presets go through at import.
+    _fill_v2_defaults(out)
+    out["meta"] = out.get("meta") or {}
+    out["meta"]["migratedFrom"] = version
+    return out
 
 
 def read_config(project: str) -> dict[str, Any] | None:

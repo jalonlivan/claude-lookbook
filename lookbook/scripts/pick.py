@@ -333,7 +333,11 @@ class PickHandler(BaseHTTPRequestHandler):
                             "name": name,
                             "label": p["label"],
                             "blurb": p["blurb"],
+                            "mode": p["mode"],
+                            "note": p.get("note"),
+                            "family": p["family"],
                             "tokens": p["tokens"],
+                            "altMode": p["altMode"],
                             "avoid": p["avoid"],
                         }
                         for name, p in schema.PRESETS.items()
@@ -662,7 +666,11 @@ def emit_html(project: str, dest: str) -> str:
                 "name": name,
                 "label": p["label"],
                 "blurb": p["blurb"],
+                "mode": p["mode"],
+                "note": p.get("note"),
+                "family": p["family"],
                 "tokens": p["tokens"],
+                "altMode": p["altMode"],
                 "avoid": p["avoid"],
             }
             for name, p in schema.PRESETS.items()

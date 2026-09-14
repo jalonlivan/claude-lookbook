@@ -1,6 +1,6 @@
 ---
 name: lookbook
-description: Pick a website's visual direction before writing any UI code. Opens a local web UI where a human chooses a look, tunes the palette and drops in reference screenshots, then writes design tokens to .claude/branding.json for every UI-generating skill in the project to obey. Use when starting a new UI, redesigning an existing one, when the user asks to set or change a project's visual direction or branding, or when a UI skill needs tokens and .claude/branding.json is missing.
+description: Pick a website's visual direction before writing any UI code. Opens a local web UI where a human picks a ground (light or dark) and then a look from eleven presets, tunes the palette, and drops in reference screenshots; writes design tokens to .claude/branding.json for every UI-generating skill in the project to obey. Covers light pigment looks (editorial, swiss, brutalist, dense product UI) and the dark developer-product family - a dark ground lit by one source with hairline borders instead of shadows, as on Vercel, GitHub, Linear-style consoles and component catalogs. Tokens cover colour, lighting and glow, typography including monospace, density, radius and motion. Use when starting a new UI, redesigning an existing one, when the user asks to set or change a project's visual direction, branding, theme, dark mode or aesthetic, when they want a site that looks premium rather than generic, or when a UI skill needs tokens and .claude/branding.json is missing.
 ---
 
 # lookbook
@@ -140,15 +140,26 @@ python <skill-dir>/scripts/pick.py --project . --preset brutalist --accent '#00A
 
 ```json
 {
-  "schemaVersion": 1,
-  "preset": "editorial-warm",
+  "schemaVersion": 2,
+  "preset": "bloom",
+  "mode":   "dark",
+  "family": "dark-dev",
   "tokens": {
-    "color":   { "bg": "…", "surface": "…", "text": "…", "muted": "…", "accent": "…", "border": "…" },
-    "type":    { "display": {"family":"…","weights":[…]}, "body": {…}, "scale": [12,14,16,20,28,44,72] },
-    "radius":  { "sm": "2px", "md": "4px", "lg": "8px" },
-    "spacing": { "base": 8 },
-    "shadow":  "none"
+    "color":    { "bg": "…", "surface": "…", "text": "…", "muted": "…", "accent": "…", "border": "…" },
+    "ground":   { "base": "#060507", "cast": "#1A0B2E" },
+    "lighting": { "type": "field", "hue": ["#A855F7","#4C1D95"], "intensity": 0.7,
+                  "position": "bottom-left", "grain": true },
+    "surface":  { "elevation": "border", "border": "rgba(255,255,255,0.08)",
+                  "raise": "rgba(255,255,255,0.04)" },
+    "type":     { "display": {"family":"…","weights":[…]}, "body": {…}, "mono": {…},
+                  "accentWord": null, "scale": [12,14,16,20,30,48,80] },
+    "radius":   { "sm": "6px", "md": "10px", "lg": "16px", "button": "999px" },
+    "spacing":  { "base": 8 },
+    "shadow":   "none",
+    "density":  "marketing",
+    "motion":   { "load": "staggered", "stagger": "60ms", "micro": "standard" }
   },
+  "altMode":    null,
   "avoid":      ["…"],
   "references": [{ "path": ".claude/branding/refs/a1f2.png", "note": "spacing and type scale, not the colours" }],
   "notes":      "free text from the human, present only if they wrote some",
@@ -156,13 +167,54 @@ python <skill-dir>/scripts/pick.py --project . --preset brutalist --accent '#00A
 }
 ```
 
+### The two families
+
+`family: "pigment"` puts the colour in the ink: a pale ground, a pigment accent,
+elevation by shadow.
+
+`family: "dark-dev"` puts the colour in the **emission**: a dark ground lit by
+one source, with the interface built out of 1px hairline borders instead of
+shadows. This is not dark mode, which is only a colour inversion. These pages
+are *lit* — one thing glows and everything else stays near-monochrome so the
+glow reads. If you take one token from this family, take
+`surface.elevation: "border"`: getting shadows out of the output does more than
+any colour choice.
+
+### The v2 groups
+
+| group | what it settles |
+| --- | --- |
+| `ground` | the page ground, and the hue cast washing through it |
+| `lighting` | `none` / `spot` / `field` / `wash`, its hue, intensity, position and grain |
+| `surface` | where elevation comes from, and the exact hairline and raise colours |
+| `type.mono` | first-class. Every one of these sites shows code; an unconsidered mono is instantly wrong |
+| `type.accentWord` | at most **one word per headline** in a contrasting face. Obey the `use` string |
+| `density` | `marketing` / `catalog` / `console` |
+| `motion` | one orchestrated page-load beats scattered micro-interactions; `stagger` is the value, do not reinvent it |
+| `radius.button` | `999px` means pills. Separate from container radius on purpose |
+
+**`lighting.grain: true` matters more than it sounds.** A large gradient without
+noise bands on real displays and reads cheap.
+
+### altMode
+
+`altMode` is an optional palette for the opposite mode. It carries only the
+groups that change with mode — `color`, `ground`, `lighting`, `surface` — since
+type, radius, spacing, density and motion do not.
+
+**`altMode: null` is an instruction, not an omission.** That look has no other
+mode. Do not invent one, and do not add a theme toggle.
+
 Rules when you consume this file:
 
 - **Use the values exactly.** Do not round a hex, swap a font for a "similar"
   one, or substitute a default for anything the file specifies.
 - **Treat `avoid` as hard constraints.** The list is generated per-project
   against the chosen palette, so it forbids the default nobody picked, not a
-  colour family someone deliberately wanted.
+  colour family someone deliberately wanted. `bloom` is deliberately purple;
+  that is a choice, not the failure the list guards against.
+- **Obey `lighting`.** One light source. A second glow, or an accent that
+  matches the glow colour, breaks the whole family.
 - **Read every image in `references[]`** before writing markup, and honour each
   `note` — it says what to take from that image and what to ignore.
 - `notes` is free text from the human. It outranks your own instincts.
@@ -205,9 +257,13 @@ import it, wrap it, or reimplement it. Paste this into that skill:
   which is what makes the choice legible.
 - The picker page is offline by default. The "load the real fonts" checkbox is
   opt-in because fetching from Google Fonts leaks the visit.
-- `schemaVersion` is checked on read. A file from a future version is treated
-  as invalid rather than half-understood, so public installs sitting on old
-  files re-pick instead of silently mis-rendering.
+- `schemaVersion` is 2. **A v1 file is migrated on read, not rejected** — every
+  v2 group is derived from what the v1 file already says, so an existing install
+  keeps its look and is never sent back to the picker. The file on disk is left
+  alone until the next write. A file from a *future* version is still refused,
+  since half-understanding it would silently mis-render someone's brand.
+- Every v2 field is additive and optional, so a v1 consumer keeps working. The
+  `mark` skill was written against v1 and reads a v2 config unchanged.
 
 ### Security
 
