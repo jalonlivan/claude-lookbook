@@ -7,27 +7,32 @@
 <link rel="icon" href="/favicon.png?t=__LOOKBOOK_TOKEN__">
 <style>
 /* ------------------------------------------------------------------
-   Claude dark: #1e1e1e ground, cream text, Claude orange accent.
-   Buttons are #c15f3c, 3px corners, and glow orange when live.
+   Claude dark: neutral grey ground, white text, Claude orange accent.
+   Buttons are #c15f3c, 3px corners. Hover and typing raise a soft grey
+   glow; orange is held back for what is actually chosen or live.
+   The chrome is sans throughout; monospace is reserved for literal
+   machine text (paths and the paste-back command), never for labels.
    ------------------------------------------------------------------ */
 :root{
-  --bg:#1e1e1e;
-  --surface:#252322;
-  --surface-2:#2c2927;
-  --sunken:#171717;
-  --border:#3a3532;
-  --border-soft:#302c29;
-  --text:#F5E6D3;
-  --muted:#A2968A;
-  --faint:#6E645C;
+  --bg:#1A1A1A;
+  --surface:#212121;
+  --surface-2:#2A2A2A;
+  --sunken:#161616;
+  --border:#333333;
+  --border-soft:#272727;
+  --border-hover:#555555;
+  --text:#FFFFFF;
+  --muted:#A0A0A0;
+  --faint:#737373;
   --accent:#E67D22;
   --btn:#c15f3c;
   --btn-hi:#d06c46;
   --glow:0 0 0 1px var(--accent), 0 0 14px rgba(230,125,34,.45);
-  --glow-soft:0 0 0 1px rgba(230,125,34,.5), 0 0 10px rgba(230,125,34,.2);
+  --glow-soft:0 0 0 1px rgba(85,85,85,.5), 0 0 10px rgba(85,85,85,.2);
   --r:3px;
+  --r-card:15px;
   --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
-  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -38,8 +43,7 @@ body{
 }
 a{color:var(--accent)}
 ::selection{background:rgba(230,125,34,.3)}
-:focus-visible{outline:none;box-shadow:var(--glow)}
-.mono{font-family:var(--mono)}
+:focus-visible{outline:none;box-shadow:var(--glow-soft)}
 .cmd{
   text-align:left;white-space:pre-wrap;word-break:break-all;max-height:190px;
   overflow:auto;font-size:10.5px;line-height:1.5;color:var(--text);
@@ -72,7 +76,7 @@ header{
   gap:9px;flex-wrap:wrap;justify-content:flex-end;
 }
 .proj{
-  font-family:var(--mono);font-size:11px;color:var(--faint);
+  font-size:11px;color:var(--faint);
   border:1px solid var(--border);border-radius:var(--r);padding:5px 9px;
   white-space:nowrap;background:var(--sunken);
 }
@@ -88,8 +92,8 @@ header{
 }
 .kofi svg{width:13px;height:13px;flex:0 0 auto}
 .kofi:hover,.kofi:focus-visible{
-  color:#FFF4E9;background:var(--btn);border-color:var(--accent);
-  box-shadow:var(--glow);outline:none;
+  color:#FFFFFF;background:var(--btn);border-color:var(--border-hover);
+  box-shadow:var(--glow-soft);outline:none;
 }
 
 /* ---------- layout ---------- */
@@ -97,7 +101,7 @@ header{
 @media (max-width:980px){.cols{grid-template-columns:minmax(0,1fr)}.rail{position:static!important}}
 
 .sec-label{
-  font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  font-size:11.5px;font-weight:600;letter-spacing:.01em;
   color:var(--faint);margin:0 0 10px;display:flex;align-items:center;gap:8px;
 }
 .sec-label::after{content:"";height:1px;flex:1;background:var(--border-soft)}
@@ -105,25 +109,26 @@ header{
 /* ---------- preset cards ---------- */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:14px}
 .card{
-  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);
   overflow:hidden;cursor:pointer;display:flex;flex-direction:column;
   transition:box-shadow .14s ease,border-color .14s ease;
 }
-.card:hover{border-color:#4a423d;box-shadow:var(--glow-soft)}
-.card:focus-visible,.card[aria-checked="true"]{border-color:var(--accent);box-shadow:var(--glow)}
+.card:hover{border-color:var(--border-hover);box-shadow:var(--glow-soft)}
+.card:focus-visible{border-color:var(--border-hover);box-shadow:var(--glow-soft);outline:none}
+.card[aria-checked="true"]{border-color:var(--accent);box-shadow:var(--glow)}
 
 /* ---------- ground chooser: step one ---------- */
 .grounds{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px}
 @media (max-width:560px){.grounds{grid-template-columns:1fr}}
 .ground{
   position:relative;overflow:hidden;cursor:pointer;text-align:left;
-  border:1px solid var(--border);border-radius:var(--r);padding:0;
+  border:1px solid var(--border);border-radius:var(--r-card);padding:0;
   background:var(--surface);font-family:var(--sans);
   transition:box-shadow .14s ease,border-color .14s ease;
 }
-.ground:hover{border-color:#4a423d;box-shadow:var(--glow-soft)}
+.ground:hover{border-color:var(--border-hover);box-shadow:var(--glow-soft)}
 .ground[aria-pressed="true"]{border-color:var(--accent);box-shadow:var(--glow)}
-.ground:focus-visible{box-shadow:var(--glow);outline:none}
+.ground:focus-visible{border-color:var(--border-hover);box-shadow:var(--glow-soft);outline:none}
 .ground-art{
   display:block;height:88px;position:relative;overflow:hidden;
   border-bottom:1px solid var(--border);
@@ -154,7 +159,7 @@ header{
 .ground-meta h3{margin:0 0 3px;font-size:13px;font-weight:600;color:var(--text)}
 .ground-meta p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.45}
 .ground-meta span{
-  display:block;margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--faint);
+  display:block;margin-top:6px;font-size:10px;color:var(--faint);
 }
 
 /* the preview renders in the preset's OWN tokens -- that is the whole point */
@@ -202,27 +207,30 @@ header{
   font-size:10.5px!important;line-height:1.45;color:var(--accent)!important;
   border-left:2px solid var(--accent);padding-left:7px;margin:1px 0 0!important;
 }
-.fonts{font-family:var(--mono);font-size:10px;color:var(--faint)}
+.fonts{font-size:10px;color:var(--faint)}
 .sw{display:flex;gap:3px;margin-top:auto;padding-top:4px}
-.sw i{width:15px;height:15px;border-radius:2px;display:block;border:1px solid rgba(245,230,211,.14)}
+.sw i{width:15px;height:15px;border-radius:2px;display:block;border:1px solid rgba(255,255,255,.14)}
 
 /* ---------- rail ---------- */
 .rail{position:sticky;top:18px;display:flex;flex-direction:column;gap:16px}
-.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:14px}
 .field{margin-bottom:12px}
 .field:last-child{margin-bottom:0}
 label.lbl{
-  display:block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--faint);margin-bottom:5px;
+  display:block;font-size:11px;font-weight:600;letter-spacing:.01em;
+  color:var(--faint);margin-bottom:5px;
 }
 input[type=text],input[type=number],textarea,select{
   width:100%;background:var(--sunken);color:var(--text);
   border:1px solid var(--border);border-radius:var(--r);padding:7px 9px;
-  font-family:var(--mono);font-size:12px;
+  font-family:var(--sans);font-size:12.5px;
   transition:box-shadow .14s ease,border-color .14s ease;
 }
+input[type=text]:hover,input[type=number]:hover,textarea:hover,select:hover{
+  border-color:var(--border-hover);box-shadow:var(--glow-soft);
+}
 input[type=text]:focus,input[type=number]:focus,textarea:focus,select:focus{
-  outline:none;border-color:var(--accent);box-shadow:var(--glow-soft);
+  outline:none;border-color:var(--border-hover);box-shadow:var(--glow-soft);
 }
 textarea{font-family:var(--sans);font-size:12.5px;line-height:1.5;resize:vertical;min-height:72px}
 select{font-family:var(--sans)}
@@ -233,20 +241,20 @@ input[type=color]{
   cursor:pointer;flex:0 0 auto;transition:box-shadow .14s ease,border-color .14s ease;
 }
 input[type=color]:hover,input[type=color]:focus-visible{
-  box-shadow:var(--glow);border-color:var(--accent);outline:none;
+  box-shadow:var(--glow-soft);border-color:var(--border-hover);outline:none;
 }
 input[type=color]::-webkit-color-swatch-wrapper{padding:0}
 input[type=color]::-webkit-color-swatch{border:none;border-radius:1px}
 
 /* ---------- buttons ---------- */
 .btn{
-  background:var(--btn);color:#FFF4E9;border:1px solid rgba(0,0,0,.25);
+  background:var(--btn);color:#FFFFFF;border:1px solid rgba(0,0,0,.25);
   border-radius:var(--r);padding:9px 14px;font-family:var(--sans);
   font-size:13px;font-weight:600;cursor:pointer;
   transition:box-shadow .14s ease,background .14s ease,transform .06s ease;
 }
-.btn:hover{background:var(--btn-hi);box-shadow:var(--glow)}
-.btn:focus-visible{box-shadow:var(--glow);outline:none}
+.btn:hover{background:var(--btn-hi);box-shadow:var(--glow-soft)}
+.btn:focus-visible{box-shadow:var(--glow-soft);outline:none}
 .btn:active{transform:translateY(1px)}
 .btn[disabled]{opacity:.45;cursor:not-allowed;box-shadow:none;background:var(--btn)}
 .btn-lg{width:100%;padding:12px 16px;font-size:14px}
@@ -260,8 +268,8 @@ input[type=color]::-webkit-color-swatch{border:none;border-radius:1px}
 /* ---------- disclosure ---------- */
 details.tune{border-top:1px solid var(--border-soft);padding-top:11px;margin-top:12px}
 details.tune>summary{
-  cursor:pointer;list-style:none;font-family:var(--mono);font-size:10px;
-  letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
+  cursor:pointer;list-style:none;font-size:11px;font-weight:600;
+  letter-spacing:.01em;color:var(--faint);
   display:flex;align-items:center;gap:6px;
 }
 details.tune>summary::-webkit-details-marker{display:none}
@@ -279,10 +287,10 @@ details.tune>summary:hover{color:var(--muted)}
   transition:box-shadow .14s,border-color .14s,color .14s;
 }
 .drop:hover,.drop.over,.drop:focus-visible{
-  border-color:var(--accent);color:var(--text);box-shadow:var(--glow-soft);outline:none;
+  border-color:var(--border-hover);color:var(--text);box-shadow:var(--glow-soft);outline:none;
 }
 .drop b{color:var(--accent);font-weight:600}
-.drop small{display:block;color:var(--faint);font-size:10.5px;margin-top:4px;font-family:var(--mono)}
+.drop small{display:block;color:var(--faint);font-size:10.5px;margin-top:4px}
 .refs{display:flex;flex-direction:column;gap:9px;margin-top:10px}
 .ref{
   display:flex;gap:9px;background:var(--sunken);border:1px solid var(--border);
@@ -398,8 +406,8 @@ details.tune>summary:hover{color:var(--muted)}
       <p class="note" id="groundHint">Pick a ground to see the looks built on it.</p>
       <div class="fontsw">
         <input type="checkbox" id="webfonts">
-        <label for="webfonts">Load the real fonts from Google Fonts for an accurate preview
-          &mdash; off by default, this page is otherwise fully offline.</label>
+        <label for="webfonts">Load the real fonts from Google Fonts for an accurate preview.
+          Off by default; this page is otherwise fully offline.</label>
       </div>
     </section>
 
@@ -432,9 +440,9 @@ details.tune>summary:hover{color:var(--muted)}
               </div>
             </div>
             <div class="field trio">
-              <div><label class="lbl" for="rSm">R sm</label><input type="text" id="rSm" spellcheck="false"></div>
-              <div><label class="lbl" for="rMd">R md</label><input type="text" id="rMd" spellcheck="false"></div>
-              <div><label class="lbl" for="rLg">R lg</label><input type="text" id="rLg" spellcheck="false"></div>
+              <div><label class="lbl" for="rSm">R SM</label><input type="text" id="rSm" spellcheck="false"></div>
+              <div><label class="lbl" for="rMd">R MD</label><input type="text" id="rMd" spellcheck="false"></div>
+              <div><label class="lbl" for="rLg">R LG</label><input type="text" id="rLg" spellcheck="false"></div>
             </div>
             <div class="field pair">
               <div>
@@ -444,10 +452,10 @@ details.tune>summary:hover{color:var(--muted)}
               <div>
                 <label class="lbl" for="shadow">Shadow</label>
                 <select id="shadow">
-                  <option value="none">none</option>
-                  <option value="0 1px 2px rgba(0,0,0,0.06)">subtle</option>
-                  <option value="0 2px 8px rgba(0,0,0,0.10)">soft</option>
-                  <option value="4px 4px 0 currentColor">hard offset</option>
+                  <option value="none">None</option>
+                  <option value="0 1px 2px rgba(0,0,0,0.06)">Subtle</option>
+                  <option value="0 2px 8px rgba(0,0,0,0.10)">Soft</option>
+                  <option value="4px 4px 0 currentColor">Hard offset</option>
                 </select>
               </div>
             </div>
@@ -464,7 +472,7 @@ details.tune>summary:hover{color:var(--muted)}
         <input type="file" id="file" class="hidden" multiple
                accept="image/png,image/jpeg,image/gif,image/webp">
         <div class="refs" id="refs"></div>
-        <p class="note">A picture beats prose &mdash; it stops the model falling back on a
+        <p class="note">A picture beats prose. It stops the model falling back on a
           familiar archetype. Say what to take from it, and what to ignore.</p>
       </div>
 
@@ -821,8 +829,7 @@ function renderPalette(t){
     hex.type = "text"; hex.value = t.color[k]; hex.spellcheck = false;
     hex.setAttribute("aria-label", k + " hex");
     var name = document.createElement("span");
-    name.className = "mono";
-    name.style.cssText = "font-size:10px;color:var(--faint);width:52px";
+    name.style.cssText = "font-size:10.5px;color:var(--faint);width:52px";
     name.textContent = k;
 
     function apply(v){
