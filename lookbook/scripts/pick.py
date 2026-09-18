@@ -317,6 +317,26 @@ class PickHandler(BaseHTTPRequestHandler):
             return False
         return True
 
+    def _drain(self) -> None:
+        """Empty the request body even when the route ignores it.
+
+        This is HTTP/1.1 with keep-alive. Bytes left unread do not vanish:
+        they sit in the socket and the parser reads them as the start of
+        the next request line, which turns a following POST into garbage
+        like "{}POST /api/submit" and a 501. Any handler that does not
+        call _read_body must call this.
+        """
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            return
+        remaining = max(0, min(length, MAX_BODY_BYTES))
+        while remaining > 0:
+            chunk = self.rfile.read(min(remaining, 65536))
+            if not chunk:
+                return
+            remaining -= len(chunk)
+
     def _read_body(self, limit: int) -> bytes | None:
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -418,6 +438,7 @@ class PickHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/resync":
             return self._handle_resync()
         if parsed.path == "/api/cancel":
+            self._drain()
             self._json(200, {"ok": True})
             self.server.result = None
             threading.Thread(target=self._stop, daemon=True).start()
@@ -432,6 +453,7 @@ class PickHandler(BaseHTTPRequestHandler):
         you get a half-written plugin and a Windows file lock. Claude runs
         the commands afterwards, from outside.
         """
+        self._drain()
         state = resync_state()
         if not state:
             return self._fail(409, "nothing to resync")

@@ -1308,7 +1308,7 @@ function mountResync(state){
     }
     btn.disabled = true;
     btn.textContent = "...";
-    api("/api/resync", {method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"})
+    api("/api/resync", {method:"POST"})
       .then(function(r){
         if (!r.ok) throw new Error(r.error || "failed");
         copy();
