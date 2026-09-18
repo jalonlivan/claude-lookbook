@@ -349,6 +349,48 @@ details.tune>summary:hover{color:var(--muted)}
   background:var(--sunken);border:1px solid var(--border);border-radius:var(--r);
   padding:9px;word-break:break-all;
 }
+
+/* ---------- resync cloud ----------
+   A nudge, not an alarm. It sits out of the way in the corner, uses the same
+   panel vocabulary as the rail, and stays grey: orange here would compete
+   with the thing the page is actually for. */
+.resync{position:fixed;right:20px;bottom:20px;z-index:40;display:flex;
+  flex-direction:column;align-items:flex-end;gap:9px}
+@media (max-width:980px){.resync{right:14px;bottom:14px}}
+.resync-dot{
+  width:38px;height:38px;border-radius:50%;cursor:pointer;
+  background:var(--surface);border:1px solid var(--border);color:var(--muted);
+  display:flex;align-items:center;justify-content:center;padding:0;
+  transition:box-shadow .14s ease,border-color .14s ease,color .14s ease;
+}
+.resync-dot svg{width:19px;height:19px;display:block}
+.resync-dot:hover,.resync-dot:focus-visible{
+  border-color:var(--border-hover);box-shadow:var(--glow-soft);color:var(--text);outline:none;
+}
+/* one pulse on arrival, then it stops moving and waits */
+.resync-dot.is-new{animation:resync-pulse 1.9s ease-out 2}
+@keyframes resync-pulse{
+  0%{box-shadow:0 0 0 0 rgba(85,85,85,.55)}
+  70%{box-shadow:0 0 0 11px rgba(85,85,85,0)}
+  100%{box-shadow:0 0 0 0 rgba(85,85,85,0)}
+}
+@media (prefers-reduced-motion:reduce){.resync-dot.is-new{animation:none}}
+.resync-pop{
+  width:308px;max-width:calc(100vw - 40px);
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-card);padding:13px;box-shadow:var(--glow-soft);
+}
+.resync-pop h4{margin:0 0 5px;font-size:12.5px;font-weight:600;color:var(--text)}
+.resync-pop p{margin:0;font-size:11.5px;color:var(--muted);line-height:1.5}
+.resync-cmd{
+  margin:10px 0 0;font-family:var(--mono);font-size:10px;line-height:1.6;
+  color:var(--muted);background:var(--sunken);border:1px solid var(--border-soft);
+  border-radius:var(--r);padding:7px 8px;white-space:pre-wrap;word-break:break-all;
+  -webkit-user-select:all;user-select:all;
+}
+.resync-actions{display:flex;gap:7px;justify-content:flex-end;margin-top:11px}
+.resync-note{margin-top:9px!important;color:var(--faint)!important;font-size:10.5px!important}
+
 </style>
 </head>
 <body>
@@ -511,6 +553,29 @@ details.tune>summary:hover{color:var(--muted)}
     <button class="btn" id="copyCmd" type="button" style="margin-top:12px">Copy command</button>
   </div>
   <p style="margin-top:14px" id="closeNote">You can close this tab.</p>
+</div>
+
+<!-- Populated only when pick.py finds a newer copy of the plugin on disk.
+     Hidden and inert otherwise; there is nothing to say most of the time. -->
+<div class="resync" id="resync" hidden>
+  <div class="resync-pop" id="resyncPop" role="dialog" aria-labelledby="resyncTitle" hidden>
+    <h4 id="resyncTitle"></h4>
+    <p id="resyncDetail"></p>
+    <pre class="resync-cmd" id="resyncCmd"></pre>
+    <p class="note resync-note" id="resyncNote"></p>
+    <div class="resync-actions">
+      <button class="btn btn-ghost btn-xs" id="resyncLater" type="button">Later</button>
+      <button class="btn btn-xs" id="resyncGo" type="button">Resync</button>
+    </div>
+  </div>
+  <button class="resync-dot" id="resyncDot" type="button"
+          aria-expanded="false" aria-controls="resyncPop" title="Plugin update">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M17.5 17.5a4 4 0 0 0-.8-7.92 5.5 5.5 0 0 0-10.56 1.1A3.5 3.5 0 0 0 6.5 17.5"/>
+      <path d="M12 12v8"/><path d="m9 17 3 3 3-3"/>
+    </svg>
+  </button>
 </div>
 
 <script>
@@ -1187,6 +1252,84 @@ function selectCmd(){
   q("#copyCmd").textContent = "Selected, press Ctrl+C";
 }
 
+// ------------------------------------------------------- resync cloud
+// pick.py decides whether there is anything to say; this only renders it.
+// The button never performs the resync -- the picker is running out of the
+// directory a reinstall replaces. It records the request and Claude does it.
+function mountResync(state){
+  if (!state || !state.commands || !state.commands.length) return;
+
+  var box = q("#resync"), pop = q("#resyncPop"), dot = q("#resyncDot");
+  var cmds = state.commands.join("\n");
+  q("#resyncTitle").textContent = state.title || "Plugin update";
+  q("#resyncDetail").textContent = state.detail || "";
+  q("#resyncCmd").textContent = cmds;
+  q("#resyncNote").textContent = MODE === "static"
+    ? "Run these in Claude Code when you are done here."
+    : "Resync tells Claude to run these once this picker closes.";
+  box.hidden = false;
+
+  // Dismissal is remembered per signal, so fixing the thing brings it back
+  // and ignoring it does not turn the corner into a permanent nag.
+  var key = "lookbook.resync." + (state.level || "") + "." +
+            (state.installed || "") + "-" + (state.available || "");
+  var seen = false;
+  try { seen = localStorage.getItem(key) === "1"; } catch (e) {}
+
+  function open(on){
+    pop.hidden = !on;
+    dot.setAttribute("aria-expanded", on ? "true" : "false");
+    if (on) dot.classList.remove("is-new");
+  }
+  dot.addEventListener("click", function(){ open(pop.hidden); });
+  q("#resyncLater").addEventListener("click", function(){
+    try { localStorage.setItem(key, "1"); } catch (e) {}
+    open(false);
+    dot.focus();
+  });
+  document.addEventListener("keydown", function(ev){
+    if (ev.key === "Escape" && !pop.hidden) { open(false); dot.focus(); }
+  });
+
+  q("#resyncGo").addEventListener("click", function(){
+    var btn = this;
+    var copy = function(){
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(cmds)["catch"](function(){});
+      }
+    };
+    if (MODE === "static"){
+      // No server to tell. Hand over the text and get out of the way.
+      copy();
+      btn.textContent = "Copied";
+      btn.disabled = true;
+      q("#resyncNote").textContent = "Paste these into Claude Code.";
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "...";
+    api("/api/resync", {method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"})
+      .then(function(r){
+        if (!r.ok) throw new Error(r.error || "failed");
+        copy();
+        btn.textContent = "Requested";
+        q("#resyncNote").textContent =
+          "Claude will offer to run these after the picker closes. "
+          + "Copied to your clipboard too.";
+        try { localStorage.setItem(key, "1"); } catch (e) {}
+      })["catch"](function(){
+        btn.disabled = false;
+        btn.textContent = "Resync";
+        q("#resyncNote").textContent = "Could not reach the picker. Run these by hand.";
+      });
+  });
+
+  if (!seen){
+    dot.classList.add("is-new");
+    setTimeout(function(){ open(true); }, 700);
+  }
+}
+
 if (MODE === "static"){
   // No server: presets are inlined, uploads are impossible, and the result
   // goes back as a command the user pastes.
@@ -1201,10 +1344,12 @@ if (MODE === "static"){
     "Gives you a command to paste back into your terminal. "
     + "Nothing is written until you run it.";
   boot(EMBEDDED.presets, EMBEDDED.project);
+  mountResync(EMBEDDED.resync);
 } else {
 api("/api/presets", {method:"GET"}).then(function(r){
   if (!r.ok) throw new Error(r.error || "no presets");
   boot(r.presets, r.project);
+  mountResync(r.resync);
 })["catch"](function(){
   q("#app").classList.add("hidden");
   var d = q("#done");

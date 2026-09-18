@@ -48,6 +48,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import resync  # noqa: E402
 import schema  # noqa: E402
 
 SKILL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -59,6 +60,17 @@ DEFAULT_TIMEOUT = 900
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_BODY_BYTES = 256 * 1024  # JSON submissions; uploads have their own cap
+
+# The drift check walks two plugin trees. Cheap, but there is no reason to
+# pay for it twice in one process, nor at all on the headless paths.
+_RESYNC: dict = {}
+
+
+def resync_state() -> dict | None:
+    if "v" not in _RESYNC:
+        _RESYNC["v"] = resync.check(SKILL_ROOT)
+    return _RESYNC["v"]
+
 
 EXIT_OK = 0
 EXIT_ABORTED = 2
@@ -218,6 +230,12 @@ def access_lines(url: str, port: int, kind: str, details: dict) -> list[str]:
     return []
 
 
+def print_resync() -> None:
+    """The terminal surface. A browser is not the only place this shows up."""
+    for line in resync.banner_lines(resync_state()):
+        print(line)
+
+
 # ==========================================================================
 # Server
 # ==========================================================================
@@ -228,6 +246,7 @@ class PickServer(ThreadingHTTPServer):
     allow_reuse_address = False  # a stale listener must not be silently adopted
 
     def __init__(self, addr, handler, *, project, token, launch_id):
+        self.resync_ack = False
         super().__init__(addr, handler)
         self.project = project
         self.token = token
@@ -344,6 +363,7 @@ class PickHandler(BaseHTTPRequestHandler):
                     ],
                     "project": os.path.basename(os.path.abspath(self.server.project))
                     or self.server.project,
+                    "resync": resync_state(),
                 },
             )
 
@@ -395,12 +415,29 @@ class PickHandler(BaseHTTPRequestHandler):
             return self._handle_upload()
         if parsed.path == "/api/submit":
             return self._handle_submit()
+        if parsed.path == "/api/resync":
+            return self._handle_resync()
         if parsed.path == "/api/cancel":
             self._json(200, {"ok": True})
             self.server.result = None
             threading.Thread(target=self._stop, daemon=True).start()
             return
         return self._fail(404, "not found")
+
+    def _handle_resync(self):
+        """Record the request. Do NOT perform it.
+
+        This process is executing out of the very directory a reinstall
+        replaces, with .in_use held open beneath it. Self-replacement is how
+        you get a half-written plugin and a Windows file lock. Claude runs
+        the commands afterwards, from outside.
+        """
+        state = resync_state()
+        if not state:
+            return self._fail(409, "nothing to resync")
+        self.server.resync_ack = True
+        resync.write_marker(self.server.project, state)
+        return self._json(200, {"ok": True, "commands": state["commands"]})
 
     def _stop(self):
         time.sleep(0.3)  # let the response flush
@@ -677,6 +714,7 @@ def emit_html(project: str, dest: str) -> str:
         ],
         "project": os.path.basename(project) or project,
         "command": f'python "{script}" --project "{project}" --apply ',
+        "resync": resync_state(),
     }
     html = render_ui("static", "static", data)
 
@@ -763,6 +801,7 @@ def report_existing(project: str, config: dict) -> None:
     print(f"lookbook: {schema.config_path(project)} already exists and is valid.")
     print(f"  preset: {config['preset']}   accent: {config['tokens']['color']['accent']}")
     print("  Re-run with --force to pick again.")
+    print_resync()
     print(f"RESULT: {schema.config_path(project)}")
 
 
@@ -866,6 +905,7 @@ def main(argv=None) -> int:
             return EXIT_BADARGS
         print(f"lookbook: wrote {args.preset} tokens")
         print(f"  accent: {doc['tokens']['color']['accent']}")
+        print_resync()
         print(f"RESULT: {path}")
         return EXIT_OK
 
@@ -886,6 +926,7 @@ def main(argv=None) -> int:
         print(f"lookbook: open {url}")
         for line in access_lines(url, port, kind, details):
             print(line)
+        print_resync()
         print(f"RESULT: {schema.config_path(project)}")
         # Opening a browser on the box the user is SSH'd into helps nobody.
         if not args.print_url and kind == "local":
@@ -917,6 +958,8 @@ def main(argv=None) -> int:
         finally:
             httpd.server_close()
             clear_runtime(project)
+        if httpd.resync_ack:
+            print(f"lookbook: resync requested -> {resync.marker_path(project)}")
         if httpd.result is not None:
             print(f"lookbook: wrote {schema.config_path(project)}")
             return EXIT_OK
@@ -933,6 +976,7 @@ def main(argv=None) -> int:
         print(f"  URL: {info['url']}")
         for line in access_lines(info["url"], int(info["port"]), kind, details):
             print(line)
+        print_resync()
         print(f"RESULT: {info['resultPath']}")
         return EXIT_OK
 
@@ -949,6 +993,7 @@ def main(argv=None) -> int:
     print(f"  expires in {args.timeout}s")
     for line in access_lines(info["url"], int(info["port"]), kind, details):
         print(line)
+    print_resync()
     print(f"RESULT: {info['resultPath']}")
     # Opening a browser on the box the user is SSH'd into helps nobody.
     if not args.print_url and kind == "local":

@@ -131,6 +131,36 @@ Dark-ground presets: `void`, `platform`, `bloom`, `gallery`, `console`,
 `dark-luxe`.
 Plus `custom`, which belongs to both.
 
+### Resync requests
+
+The picker checks whether the copy of this plugin you are running is behind a
+copy already sitting on the disk -- a newer version Claude Code fetched but
+never installed, or a marketplace clone whose files no longer match. It makes
+no network calls; it only reads what Claude Code has already downloaded.
+
+When it finds something it says so in the launch output, and the browser shows
+a cloud in the corner with a **Resync** button. That button does not reinstall
+anything. The picker is executing out of the directory a reinstall replaces,
+so self-replacement is how you end up with a half-written plugin.
+
+Instead it writes `.claude/branding/.lookbook-resync.json`. **After the picker
+returns, check for that file.** If it is there, the human asked for the resync:
+tell them what is stale, offer to run the two commands it lists (they are
+slash commands -- the human runs them, you cannot), then delete the file so it
+does not ask twice.
+
+```json
+{ "level": "update", "installed": "2.0.0", "available": "2.1.0",
+  "commands": ["/plugin marketplace update <market>",
+               "/plugin install <plugin>@<market>"] }
+```
+
+`level` is `update` when a newer version is genuinely on disk, `drift` when the
+files differ at the same version number, `orphaned` when Claude Code no longer
+counts the running copy as installed, and `stale` when nothing local has
+checked in three weeks. Only `update` means a new version certainly exists --
+do not upgrade the others' wording when you relay them.
+
 ### Exit codes
 
 | code | meaning |
@@ -295,3 +325,8 @@ While a picker is live it keeps `.claude/branding/.lookbook-run.json` (port,
 token, pid) and appends to `.claude/branding/.lookbook-server.log`. The run
 file is removed on shutdown. Re-running the command while a picker is already
 up reuses it rather than stacking a second server.
+
+A resync request from the picker's cloud button lands in
+`.claude/branding/.lookbook-resync.json`. Unlike the run file it is *not*
+cleaned up on shutdown -- it is a message, and it stays until whoever reads it
+deletes it.
